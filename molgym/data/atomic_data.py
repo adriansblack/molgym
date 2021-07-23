@@ -3,7 +3,8 @@ from typing import Sequence, Optional
 import torch.utils.data
 import torch_geometric
 
-from molgym.tools import to_one_hot, AtomicNumberTable, atomic_numbers_to_indices
+from molgym.tools import to_one_hot
+from .atomic_number_table import AtomicNumberTable, atomic_numbers_to_indices
 from .neighborhood import get_neighborhood
 from .utils import Configuration
 

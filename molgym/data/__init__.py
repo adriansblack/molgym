@@ -1,4 +1,5 @@
 from .atomic_data import AtomicData, get_data_loader
+from .atomic_number_table import AtomicNumberTable, atomic_numbers_to_indices
 from .neighborhood import get_neighborhood
 from .rmd17 import atomic_energies as rmd17_atomic_energies
 from .rmd17 import load as load_rmd17
@@ -7,5 +8,6 @@ from .xyz import load_xyz, config_from_atoms
 
 __all__ = [
     'load_rmd17', 'rmd17_atomic_energies', 'AtomicData', 'get_data_loader', 'get_neighborhood', 'Configuration',
-    'Configurations', 'load_xyz', 'config_from_atoms', 'split_train_valid_configs'
+    'Configurations', 'load_xyz', 'config_from_atoms', 'split_train_valid_configs', 'AtomicNumberTable',
+    'atomic_numbers_to_indices'
 ]
