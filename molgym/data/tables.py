@@ -1,4 +1,4 @@
-from typing import Sequence, Iterable, Tuple
+from typing import Sequence, Iterable, Tuple, Union
 
 
 class AtomicNumberTable:
@@ -25,6 +25,7 @@ def get_atomic_number_table_from_zs(zs: Iterable[int]) -> AtomicNumberTable:
     return AtomicNumberTable(sorted(list(z_set)))
 
 
+Bag = Tuple[Union[int, float], ...]
 DiscreteBag = Tuple[int, ...]
 
 

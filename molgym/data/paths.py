@@ -6,7 +6,7 @@ import ase.io
 import numpy as np
 
 from . import graph_tools, tables
-from .tables import DiscreteBag, AtomicNumberTable
+from .tables import DiscreteBag, Bag, AtomicNumberTable
 
 
 @dataclass
@@ -15,6 +15,12 @@ class Action:
     z: int
     distance: float
     orientation: Tuple[float, float, float]
+
+
+@dataclass
+class State:
+    atoms: ase.Atoms
+    bag: Bag
 
 
 @dataclass
@@ -29,8 +35,25 @@ class DiscreteBagStateActionPair:
     action: Action
 
 
+@dataclass
+class StateActionPair:
+    state: State
+    action: Action
+
+
+@dataclass
+class SARS:
+    state: State
+    action: Action
+    reward: float
+    next_state: State
+    done: bool
+
+
+Trajectory = Sequence[SARS]
+
+ConstructionPath = Sequence[StateActionPair]
 DiscreteBagConstructionPath = Sequence[DiscreteBagStateActionPair]
-DiscreteBagConstructionPaths = Sequence[DiscreteBagConstructionPath]
 
 
 def get_atoms_list(atoms: ase.Atoms) -> List[ase.Atoms]:
@@ -106,8 +129,8 @@ def reorder_random_neighbor(atoms: ase.Atoms, cutoff_distance=1.6, seed=1) -> as
 
 def get_discrete_bags(atoms: ase.Atoms, z_table: AtomicNumberTable) -> List[DiscreteBag]:
     return [
-        tables.discrete_bag_from_atomic_numbers(zs=(ase.data.atomic_numbers[s] for s in atoms[i:].symbols), z_table=z_table)
-        for i in range(len(atoms))
+        tables.discrete_bag_from_atomic_numbers(zs=(ase.data.atomic_numbers[s] for s in atoms[i:].symbols),
+                                                z_table=z_table) for i in range(len(atoms))
     ]
 
 
@@ -136,3 +159,19 @@ def propagate_state(pair: DiscreteBagStateActionPair, z_table: AtomicNumberTable
         atoms=state.atoms.copy() + ase.Atom(symbol=action.z, position=new_position),
         bag=tables.remove_z_from_bag(action.z, state.bag, z_table),
     )
+
+
+def generate_sparse_reward_trajectory(path: ConstructionPath, final_reward: float) -> Trajectory:
+    tau = []
+    length = len(path)
+    for index, (first_pair, second_pair) in enumerate(zip(path[:-1], path[1:])):
+        tau.append(
+            SARS(
+                state=first_pair.state,
+                action=first_pair.action,
+                reward=final_reward if index == length - 1 else 0.0,
+                next_state=second_pair.state,
+                done=index == length - 1,
+            ))
+
+    return tau
