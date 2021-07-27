@@ -15,7 +15,7 @@ def generate_topology(
     graph = nx.Graph()
 
     if node_data:
-        graph.add_nodes_from((i, {'symbol': atom.symbol, 'position': atom.position}) for i, atom in enumerate(atoms))
+        graph.add_nodes_from((i, {'z': atom.z, 'position': atom.position}) for i, atom in enumerate(atoms))
 
     for (i, a_i), (j, a_j) in itertools.combinations(list(enumerate(atoms)), 2):
         if np.linalg.norm(a_i.position - a_j.position) < cutoff_distance:

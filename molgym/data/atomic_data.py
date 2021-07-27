@@ -1,12 +1,18 @@
 from typing import Sequence, Optional
 
+import numpy as np
 import torch.utils.data
 import torch_geometric
 
 from molgym.tools import to_one_hot
-from .atomic_number_table import AtomicNumberTable, atomic_numbers_to_indices
+from .tables import AtomicNumberTable
 from .neighborhood import get_neighborhood
 from .utils import Configuration
+
+
+def atomic_numbers_to_index_array(atomic_numbers: np.ndarray, z_table: AtomicNumberTable) -> np.ndarray:
+    to_index_fn = np.vectorize(z_table.z_to_index)
+    return to_index_fn(atomic_numbers)
 
 
 class AtomicData(torch_geometric.data.Data):
@@ -50,7 +56,7 @@ class AtomicData(torch_geometric.data.Data):
 
     @classmethod
     def from_config(cls, config: Configuration, z_table: AtomicNumberTable, cutoff: float) -> 'AtomicData':
-        indices = atomic_numbers_to_indices(config.atomic_numbers, z_table=z_table)
+        indices = atomic_numbers_to_index_array(config.atomic_numbers, z_table=z_table)
         one_hot_attrs = to_one_hot(
             indices=torch.tensor(indices, dtype=torch.long).unsqueeze(-1),
             num_classes=len(z_table),

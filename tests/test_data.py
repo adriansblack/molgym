@@ -1,7 +1,16 @@
 import numpy as np
 
 from molgym.data import Configuration, AtomicData, get_data_loader, get_neighborhood
-from molgym.data.atomic_number_table import AtomicNumberTable
+from molgym.data.atomic_data import atomic_numbers_to_index_array
+from molgym.data.tables import AtomicNumberTable
+
+
+def test_conversion():
+    table = AtomicNumberTable(zs=[1, 8])
+    array = np.array([8, 8, 1])
+    indices = atomic_numbers_to_index_array(array, z_table=table)
+    expected = np.array([1, 1, 0], dtype=int)
+    assert np.allclose(expected, indices)
 
 
 class TestAtomicData:

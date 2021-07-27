@@ -4,6 +4,8 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Optional, List, Tuple
 
+import ase
+import ase.build
 import numpy as np
 
 Vector = np.ndarray  # [3,]
@@ -20,6 +22,16 @@ class Configuration:
 
 
 Configurations = List[Configuration]
+
+
+def rotation_translation_align(atoms: ase.Atoms, target: ase.Atoms) -> ase.Atoms:
+    aligned = atoms.copy()
+    ase.build.minimize_rotation_and_translation(target, aligned)
+    return aligned
+
+
+def compute_rmsd(a: ase.Atoms, b: ase.Atoms) -> float:
+    return np.sqrt(np.mean(np.square(a.positions - b.positions)))
 
 
 def get_split_sizes(size: int, first_fraction: float) -> Tuple[int, int]:

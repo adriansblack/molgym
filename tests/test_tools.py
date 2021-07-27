@@ -5,16 +5,7 @@ import torch
 import torch.nn.functional
 from torch import nn, optim
 
-from molgym.data.atomic_number_table import AtomicNumberTable, atomic_numbers_to_indices
 from molgym.tools import CheckpointState, CheckpointHandler
-
-
-def test_conversion():
-    table = AtomicNumberTable(zs=[1, 8])
-    array = np.array([8, 8, 1])
-    indices = atomic_numbers_to_indices(array, z_table=table)
-    expected = np.array([1, 1, 0], dtype=int)
-    assert np.allclose(expected, indices)
 
 
 class MyModel(nn.Module):
