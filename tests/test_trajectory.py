@@ -10,8 +10,8 @@ import pytest
 
 from molgym.data import AtomicNumberTable
 from molgym.data.graph_tools import generate_topology
-from molgym.data.paths import (Action, get_actions, reorder_breadth_first, generate_discrete_bag_construction_path,
-                               DiscreteBagState, propagate_state, DiscreteBagStateActionPair)
+from molgym.data.trajectory import (Action, get_actions, reorder_breadth_first, generate_sparse_reward_trajectory,
+                                    DiscreteBagState, propagate_discrete_bag_state)
 from molgym.data.utils import rotation_translation_align, compute_rmsd
 
 
@@ -88,26 +88,28 @@ def test_rollout(ethanol):
     assert rmsd < 1e-10
 
 
-def test_path_generation(ethanol):
+def test_trajectory_generation(ethanol):
     z_table = AtomicNumberTable([1, 6, 8])
-    path = generate_discrete_bag_construction_path(atoms=ethanol, z_table=z_table)
+    trajectory = generate_sparse_reward_trajectory(atoms=ethanol, z_table=z_table, final_reward=1.5)
 
-    p_0 = path[0]
-    assert len(p_0.state.atoms) == 0  # canvas is empty
-    assert sum(p_0.state.bag) == len(ethanol)  # bag is full
+    sars_first = trajectory[0]
+    assert len(sars_first.state.atoms) == 0  # canvas is empty
+    assert sum(sars_first.state.bag) == len(ethanol)  # bag is full
 
-    p_T = path[-1]
-    assert len(p_T.state.atoms) == len(ethanol) - 1  # canvas close to full
-    assert sum(p_T.state.bag) == 1  # one atom remaining
+    sars_last = trajectory[-1]
+    assert len(sars_last.state.atoms) == len(ethanol) - 1  # canvas close to full
+    assert sum(sars_last.state.bag) == 1  # one atom remaining
+    assert len(sars_last.next_state.atoms) == len(ethanol)  # canvas is full
+    assert sum(sars_last.next_state.bag) == 0  # no atoms remaining
 
 
 def test_propagate():
     z_table = AtomicNumberTable([1])
     state = DiscreteBagState(atoms=ase.Atoms(), bag=(1, 1, 1))
     action = Action(focus=0, z=1, distance=1.5, orientation=(1.5, 1.0, 1.2))
-    new_state = propagate_state(DiscreteBagStateActionPair(state, action), z_table)
+    new_state = propagate_discrete_bag_state(state, action, z_table)
     assert len(new_state.atoms) == 1
 
     action = Action(focus=0, z=2, distance=1.5, orientation=(1.5, 1.0, 1.2))
     with pytest.raises(ValueError):
-        propagate_state(DiscreteBagStateActionPair(state, action), z_table)
+        propagate_discrete_bag_state(state, action, z_table)

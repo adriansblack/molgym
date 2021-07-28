@@ -30,18 +30,6 @@ class DiscreteBagState:
 
 
 @dataclass
-class DiscreteBagStateActionPair:
-    state: DiscreteBagState
-    action: Action
-
-
-@dataclass
-class StateActionPair:
-    state: State
-    action: Action
-
-
-@dataclass
 class SARS:
     state: State
     action: Action
@@ -51,13 +39,6 @@ class SARS:
 
 
 Trajectory = Sequence[SARS]
-
-ConstructionPath = Sequence[StateActionPair]
-DiscreteBagConstructionPath = Sequence[DiscreteBagStateActionPair]
-
-
-def get_atoms_list(atoms: ase.Atoms) -> List[ase.Atoms]:
-    return [atoms[:i] for i in range(len(atoms))]
 
 
 def get_focus(canvas: ase.Atoms, atom: ase.Atom) -> int:
@@ -105,7 +86,7 @@ def get_orientation(
 
 def get_actions(atoms: ase.Atoms) -> Sequence[Action]:
     focuses = [get_focus(atoms[:t], atoms[t]) for t in range(len(atoms))]
-    zs = [atom.z for atom in atoms]
+    zs = [ase.data.atomic_numbers[atom.symbol] for atom in atoms]
     distances = [get_distance(canvas=atoms[:t], focus=focuses[t], new_atom=atoms[t]) for t in range(len(atoms))]
     orientations = [get_orientation(canvas=atoms[:t], focus=focuses[t], new_atom=atoms[t]) for t in range(len(atoms))]
 
@@ -127,29 +108,19 @@ def reorder_random_neighbor(atoms: ase.Atoms, cutoff_distance=1.6, seed=1) -> as
     return graph_tools.select_atoms(atoms, sequence)
 
 
+def get_canvases(atoms: ase.Atoms) -> List[ase.Atoms]:
+    return [atoms[:i] for i in range(len(atoms) + 1)]
+
+
 def get_discrete_bags(atoms: ase.Atoms, z_table: AtomicNumberTable) -> List[DiscreteBag]:
     return [
         tables.discrete_bag_from_atomic_numbers(zs=(ase.data.atomic_numbers[s] for s in atoms[i:].symbols),
-                                                z_table=z_table) for i in range(len(atoms))
+                                                z_table=z_table) for i in range(len(atoms) + 1)
     ]
 
 
-def generate_discrete_bag_construction_path(atoms: ase.Atoms, z_table: AtomicNumberTable) \
-        -> DiscreteBagConstructionPath:
-    atoms_list = get_atoms_list(atoms)
-    bags = get_discrete_bags(atoms, z_table)
-    actions = get_actions(atoms)
-
-    # yapf: disable
-    return list(
-        DiscreteBagStateActionPair(state=DiscreteBagState(atoms, bag), action=action)
-        for (atoms, bag, action) in zip(atoms_list, bags, actions)
-    )
-    # yapf: enable
-
-
-def propagate_state(pair: DiscreteBagStateActionPair, z_table: AtomicNumberTable) -> DiscreteBagState:
-    state, action = pair.state, pair.action
+def propagate_discrete_bag_state(state: DiscreteBagState, action: Action,
+                                 z_table: AtomicNumberTable) -> DiscreteBagState:
     if len(state.atoms) == 0:
         new_position = np.array([0., 0., 0.])
     else:
@@ -161,16 +132,24 @@ def propagate_state(pair: DiscreteBagStateActionPair, z_table: AtomicNumberTable
     )
 
 
-def generate_sparse_reward_trajectory(path: ConstructionPath, final_reward: float) -> Trajectory:
+def generate_sparse_reward_trajectory(atoms: ase.Atoms, z_table: AtomicNumberTable, final_reward: float) -> Trajectory:
+    atoms_list = get_canvases(atoms)
+    bags = get_discrete_bags(atoms, z_table)
+    states = [State(atoms=atoms, bag=bag) for atoms, bag in zip(atoms_list, bags)]
+
+    actions = get_actions(atoms)
+    length = len(actions)
+
+    assert len(actions) == len(states) - 1
+
     tau = []
-    length = len(path)
-    for index, (first_pair, second_pair) in enumerate(zip(path[:-1], path[1:])):
+    for index, (state, action, next_state) in enumerate(zip(states[:-1], actions, states[1:])):
         tau.append(
             SARS(
-                state=first_pair.state,
-                action=first_pair.action,
+                state=state,
+                action=action,
                 reward=final_reward if index == length - 1 else 0.0,
-                next_state=second_pair.state,
+                next_state=next_state,
                 done=index == length - 1,
             ))
 
