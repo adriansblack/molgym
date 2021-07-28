@@ -92,6 +92,12 @@ def test_trajectory_generation(ethanol):
     z_table = AtomicNumberTable([1, 6, 8])
     trajectory = generate_sparse_reward_trajectory(atoms=ethanol, z_table=z_table, final_reward=1.5)
 
+    assert all(not sars.done for sars in trajectory[:-1])
+    assert trajectory[-1].done
+
+    assert all(np.isclose(sars.reward, 0.) for sars in trajectory[:-1])
+    assert np.isclose(trajectory[-1].reward, 1.5)
+
     sars_first = trajectory[0]
     assert len(sars_first.state.atoms) == 0  # canvas is empty
     assert sum(sars_first.state.bag) == len(ethanol)  # bag is full
