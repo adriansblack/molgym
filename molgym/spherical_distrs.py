@@ -95,8 +95,8 @@ class SO3Distribution(SphericalDistribution):
 
         super().__init__(batch_shape=torch.Size(a_lms.shape[:-1]), validate_args=False, device=device, dtype=dtype)
 
-        self.lmax = lmax
         self.b_lms = self.normalize(a_lms)
+        self.lmax = lmax
         self.gamma = gamma
 
         self.spherical_uniform = SphericalUniform(batch_shape=self.batch_shape, device=device, dtype=dtype)
@@ -104,11 +104,10 @@ class SO3Distribution(SphericalDistribution):
         self.log_z = self.compute_log_z()
 
     def __str__(self) -> str:
-        return f'SO3Distribution(l_max={self.lmax})'
+        return f'SO3Distribution(l_max={self.lmax}, gamma={self.gamma}, batch_shape={tuple(self.batch_shape)})'
 
     @staticmethod
     def normalize(a_lms) -> torch.Tensor:
-        assert len(a_lms.shape) == 2
         k = torch.sum(torch.square(a_lms), dim=-1, keepdim=True)  # [B, 1]
         return a_lms / torch.sqrt(k.clamp(min=1e-10))
 
@@ -181,8 +180,7 @@ class SO3Distribution(SphericalDistribution):
 
         # b_lms: [B, (lmax + 1)^2]
         # y_lms: [S, B, (lmax + 1)^2]
-        f = torch.square(torch.sum(self.b_lms * y_lms, dim=-1))
-        return -self.gamma * f
+        return self.gamma * torch.sum(self.b_lms * y_lms, dim=-1)
 
     def compute_log_z(self) -> torch.Tensor:
         grid = quadpy.u3._lebedev.lebedev_071()  # pylint: disable=protected-access
