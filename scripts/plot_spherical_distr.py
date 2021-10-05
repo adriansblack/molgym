@@ -3,24 +3,20 @@ import plotly.graph_objects as go
 import torch
 from e3nn import o3
 
-from molgym.spherical_distrs import SO3Distribution, SphericalUniform
+from molgym.spherical_distrs import SO3Distribution
 from molgym.tools import set_seeds
 
 
-def get_random_samples(n: int) -> torch.Tensor:
-    return SphericalUniform(batch_shape=torch.Size((1, ))).sample(torch.Size((n, )))
-
-
-def get_ring_samples(beta: float, n: int) -> torch.Tensor:
+def get_ring_samples(beta: float, num: int) -> torch.Tensor:
+    alphas = torch.linspace(0, 2 * np.pi, steps=num + 1)[:-1]
     betas = torch.tensor([beta])
-    alphas = torch.linspace(0, 2 * np.pi, n)[:-1]
-    beta, alpha = torch.meshgrid(betas, alphas)
-    return o3.angles_to_xyz(alpha, beta).reshape(-1, 1, 3)
+    alpha, beta = torch.meshgrid(alphas, betas)
+    return o3.angles_to_xyz(alpha, beta).reshape(-1, 3)
 
 
-def s2_grid():
-    betas = torch.linspace(0, np.pi, 80)
-    alphas = torch.linspace(0, 2 * np.pi, 80)
+def s2_grid(num=80) -> torch.Tensor:
+    betas = torch.linspace(0, np.pi, num)
+    alphas = torch.linspace(0, 2 * np.pi, num)
     beta, alpha = torch.meshgrid(betas, alphas)
     return o3.angles_to_xyz(alpha, beta)
 
@@ -31,7 +27,8 @@ def loss_fn(spherical: SO3Distribution, data: torch.Tensor) -> torch.Tensor:
 
 def optimize_parameters(coeffs: torch.Tensor, lmax: int, gamma: float, data: torch.Tensor, max_num_epochs=5000):
     optimizer = torch.optim.Adam(params=[coeffs], lr=1E-2, amsgrad=True)
-    old_loss = np.inf
+
+    prev_loss = np.inf
     for i in range(max_num_epochs):
         optimizer.zero_grad()
         spherical = SO3Distribution(a_lms=coeffs, lmax=lmax, gamma=gamma)
@@ -40,14 +37,14 @@ def optimize_parameters(coeffs: torch.Tensor, lmax: int, gamma: float, data: tor
         optimizer.step()
 
         loss = loss.detach().numpy()
-        if np.abs(loss - old_loss) < 5e-4:
-            print('converged')
+        if np.abs(loss - prev_loss) < 1e-6:
+            print(f'Converged after {i+1} steps')
             break
         else:
-            old_loss = loss
+            prev_loss = loss
 
     spherical = SO3Distribution(a_lms=coeffs, lmax=lmax, gamma=gamma)
-    print('final loss', loss_fn(spherical, data).item())
+    print(f'Final loss {loss_fn(spherical, data).item():.3f}')
 
 
 colors = [
@@ -70,9 +67,8 @@ def plot(grid, values, points_list) -> None:
         # showticklabels=False,
         # showgrid=True,
         # zeroline=False,
-        title='',
-        nticks=3,
-    )
+        # title='',
+        nticks=3, )
 
     layout = dict(
         width=480,
@@ -127,35 +123,43 @@ def plot(grid, values, points_list) -> None:
 def main():
     set_seeds(1)
 
+    num_datapoints = 1
     num_samples = 25
-    num_datapoints = 15
-    lmax = 4
+    lmax = 3
     gamma = 25
 
-    coeffs = torch.randn(1, (lmax + 1)**2, requires_grad=True)
+    # Note: sample, batch, event (S, B, E)
+    data1 = torch.cat([
+        get_ring_samples(beta=np.pi / 3, num=num_datapoints),
+        get_ring_samples(beta=2 * np.pi / 3, num=num_datapoints)
+    ],
+                      dim=0)
+    data2 = get_ring_samples(beta=np.pi / 2, num=2 * num_datapoints)
+    data3 = get_ring_samples(beta=np.pi / 3, num=2 * num_datapoints)
+    data_list = [data1, data2, data3]
+    data = torch.stack(data_list).transpose(0, 1)
+    print('Samples:', data.shape)  # [S, B, E]
 
-    data = torch.cat(
-        [
-            get_ring_samples(beta=np.pi / 5, n=num_datapoints),
-            # get_ring_samples(beta=4 * np.pi / 5, n=num_datapoints),
-        ],
-        dim=0)
-    # samples = get_random_samples(num_samples)
-
-    print('Num samples: ', data.shape[0])
-
+    # Optimize coefficients
+    coeffs = torch.randn(data.shape[1], (lmax + 1)**2, requires_grad=True)
     optimize_parameters(coeffs, lmax=lmax, gamma=gamma, data=data)
 
-    grid = s2_grid()
     spherical = SO3Distribution(a_lms=coeffs, lmax=lmax, gamma=gamma)
-    values = torch.exp(spherical.log_prob(grid.unsqueeze(-2)).squeeze(-1).detach())
-    samples = spherical.sample(torch.Size((num_samples, ))).squeeze(-1)
+    print(spherical)
 
-    plot(
-        grid=grid,
-        values=values,
-        points_list=[data, samples],
-    )
+    # Compute logp's on mesh and sample
+    grid = s2_grid()
+    values_list = torch.exp(spherical.log_prob(grid.unsqueeze(-2)).detach()).split(1, dim=-1)  # [S..., B]
+    samples_list = spherical.sample(torch.Size((num_samples, ))).split(1, dim=-2)  # [S, B, E]
+
+    # Visualize
+    for values, samples, data in zip(values_list, samples_list, data_list):
+        plot(
+            grid=grid,
+            values=values.squeeze(-1),
+            points_list=[data, samples],
+        )
 
 
-main()
+if __name__ == '__main__':
+    main()
