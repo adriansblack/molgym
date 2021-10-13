@@ -9,7 +9,7 @@ class AtomicNumberTable:
         return len(self.zs)
 
     def __str__(self):
-        return f'AtomicNumberTable: {tuple(s for s in self.zs)}'
+        return f'{self.__class__.__name__}: {tuple(s for s in self.zs)}'
 
     def index_to_z(self, index: int) -> int:
         return self.zs[index]
@@ -40,7 +40,7 @@ def discrete_bag_from_atomic_numbers(zs: Iterable[int], z_table: AtomicNumberTab
 def remove_z_from_bag(z: int, bag: DiscreteBag, z_table: AtomicNumberTable) -> DiscreteBag:
     index = z_table.z_to_index(z)
     if bag[index] < 1:
-        raise ValueError(f"Cannot atomic number '{z}' in '{bag}'")
+        raise ValueError(f"Cannot remove atomic number '{z}' from '{bag}'")
 
     copy = list(bag)
     copy[index] -= 1

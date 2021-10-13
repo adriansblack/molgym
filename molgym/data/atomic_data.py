@@ -1,12 +1,12 @@
-from typing import Sequence, Optional
+from typing import Optional
 
 import numpy as np
 import torch.utils.data
 import torch_geometric
 
 from molgym.tools import to_one_hot
-from .tables import AtomicNumberTable
 from .neighborhood import get_neighborhood
+from .tables import AtomicNumberTable
 from .utils import Configuration
 
 
@@ -76,17 +76,3 @@ class AtomicData(torch_geometric.data.Data):
             forces=forces,
             energy=energy,
         )
-
-
-def get_data_loader(
-    dataset: Sequence[AtomicData],
-    batch_size: int,
-    shuffle=True,
-    drop_last=False,
-) -> torch.utils.data.DataLoader:
-    return torch_geometric.data.DataLoader(
-        dataset=dataset,
-        batch_size=batch_size,
-        shuffle=shuffle,
-        drop_last=drop_last,
-    )

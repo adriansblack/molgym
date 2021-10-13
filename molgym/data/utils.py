@@ -1,11 +1,11 @@
 import logging
-import os
-import urllib.request
 from dataclasses import dataclass
-from typing import Optional, List, Tuple
+from typing import Optional, List
 
 import ase
 import ase.build
+import ase.data
+import ase.io
 import numpy as np
 
 Vector = np.ndarray  # [3,]
@@ -34,26 +34,16 @@ def compute_rmsd(a: ase.Atoms, b: ase.Atoms) -> float:
     return np.sqrt(np.mean(np.square(a.positions - b.positions)))
 
 
-def get_split_sizes(size: int, first_fraction: float) -> Tuple[int, int]:
-    assert 0.0 < first_fraction < 1.0
-    first_size = int(first_fraction * size)
-    return first_size, size - first_size
+def config_from_atoms(atoms: ase.Atoms, energy_key='energy', forces_key='forces') -> Configuration:
+    energy = atoms.info.get(energy_key, None)  # eV
+    forces = atoms.arrays.get(forces_key, None)  # eV / Ang
+    atomic_numbers = np.array([ase.data.atomic_numbers[symbol] for symbol in atoms.symbols])
+    return Configuration(atomic_numbers=atomic_numbers, positions=atoms.positions, energy=energy, forces=forces)
 
 
-def split_train_valid_configs(configs: Configurations, valid_fraction: float) -> Tuple[Configurations, Configurations]:
-    _, train_size = get_split_sizes(len(configs), first_fraction=valid_fraction)
-    return configs[:train_size], configs[train_size:]
-
-
-def download_url(url: str, save_path: str) -> None:
-    with urllib.request.urlopen(url) as download_file:
-        with open(save_path, 'wb') as out_file:
-            out_file.write(download_file.read())
-
-
-def fetch_archive(path: str, url: str, force_download=False) -> None:
-    if not os.path.exists(path) and not force_download:
-        logging.info(f'Downloading {url} to {path}')
-        download_url(url=url, save_path=path)
-    else:
-        logging.info(f'File {path} exists')
+def load_xyz(path: str, formatting: str = 'extxyz') -> Configurations:
+    logging.info(f"Loading dataset from '{path}' (format={formatting})")
+    atoms_list = ase.io.read(path, ':', format=formatting)
+    configs = [config_from_atoms(atoms) for atoms in atoms_list]
+    logging.info(f'Number of configurations: {len(configs)}')
+    return configs
