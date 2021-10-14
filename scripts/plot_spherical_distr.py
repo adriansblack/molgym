@@ -37,11 +37,11 @@ def optimize_parameters(coeffs: torch.Tensor, lmax: int, gamma: float, data: tor
         optimizer.step()
 
         loss = loss.detach().numpy()
-        if np.abs(loss - prev_loss) < 1e-6:
+        if np.abs(loss - prev_loss) > 1e-6:
+            prev_loss = loss
+        else:
             print(f'Converged after {i+1} steps')
             break
-        else:
-            prev_loss = loss
 
     spherical = SO3Distribution(a_lms=coeffs, lmax=lmax, gamma=gamma)
     print(f'Final loss {loss_fn(spherical, data).item():.3f}')

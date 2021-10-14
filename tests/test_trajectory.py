@@ -12,7 +12,16 @@ from molgym.data import AtomicNumberTable
 from molgym.data.graph_tools import generate_topology
 from molgym.data.trajectory import (Action, get_actions, reorder_breadth_first, generate_sparse_reward_trajectory,
                                     DiscreteBagState, propagate_discrete_bag_state)
-from molgym.data.utils import rotation_translation_align, compute_rmsd
+
+
+def rotation_translation_align(atoms: ase.Atoms, target: ase.Atoms) -> ase.Atoms:
+    aligned = atoms.copy()
+    ase.build.minimize_rotation_and_translation(target, aligned)
+    return aligned
+
+
+def compute_rmsd(a: ase.Atoms, b: ase.Atoms) -> float:
+    return np.sqrt(np.mean(np.square(a.positions - b.positions)))
 
 
 @pytest.fixture

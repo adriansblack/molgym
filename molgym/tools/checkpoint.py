@@ -122,4 +122,3 @@ class CheckpointHandler:
         checkpoint, epochs = self.io.load(path, device=device)
         self.builder.load_checkpoint(state=state, checkpoint=checkpoint, strict=strict)
         return epochs
-

@@ -1,6 +1,7 @@
 import numpy as np
+import torch_geometric
 
-from molgym.data import Configuration, AtomicData, get_data_loader, get_neighborhood
+from molgym.data import Configuration, AtomicData, get_neighborhood
 from molgym.data.atomic_data import atomic_numbers_to_index_array
 from molgym.data.tables import AtomicNumberTable
 
@@ -41,8 +42,7 @@ class TestAtomicData:
         data1 = AtomicData.from_config(self.config, z_table=self.table, cutoff=3.0)
         data2 = AtomicData.from_config(self.config, z_table=self.table, cutoff=3.0)
 
-        data_loader = get_data_loader([data1, data2], batch_size=32)
-        assert data_loader
+        assert torch_geometric.data.DataLoader(dataset=[data1, data2], batch_size=32)
 
 
 def test_neighborhood_basics():

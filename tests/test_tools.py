@@ -21,15 +21,13 @@ def test_save_load():
     model = MyModel()
     initial_lr = 0.001
     optimizer = optim.SGD(model.parameters(), lr=initial_lr, momentum=0.9)
-    scheduler = optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.99)
 
     with tempfile.TemporaryDirectory() as directory:
         handler = CheckpointHandler(directory=directory, tag='test', keep=True)
-        handler.save(state=CheckpointState(model, optimizer, scheduler), epochs=50)
+        handler.save(state=CheckpointState(model, optimizer), epochs=50)
 
         optimizer.step()
-        scheduler.step()
-        assert not np.isclose(optimizer.param_groups[0]['lr'], initial_lr)
+        assert np.isclose(optimizer.param_groups[0]['lr'], initial_lr)
 
-        handler.load_latest(state=CheckpointState(model, optimizer, scheduler))
+        handler.load_latest(state=CheckpointState(model, optimizer))
         assert np.isclose(optimizer.param_groups[0]['lr'], initial_lr)

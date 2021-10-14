@@ -24,16 +24,6 @@ class Configuration:
 Configurations = List[Configuration]
 
 
-def rotation_translation_align(atoms: ase.Atoms, target: ase.Atoms) -> ase.Atoms:
-    aligned = atoms.copy()
-    ase.build.minimize_rotation_and_translation(target, aligned)
-    return aligned
-
-
-def compute_rmsd(a: ase.Atoms, b: ase.Atoms) -> float:
-    return np.sqrt(np.mean(np.square(a.positions - b.positions)))
-
-
 def config_from_atoms(atoms: ase.Atoms, energy_key='energy', forces_key='forces') -> Configuration:
     energy = atoms.info.get(energy_key, None)  # eV
     forces = atoms.arrays.get(forces_key, None)  # eV / Ang
@@ -41,9 +31,8 @@ def config_from_atoms(atoms: ase.Atoms, energy_key='energy', forces_key='forces'
     return Configuration(atomic_numbers=atomic_numbers, positions=atoms.positions, energy=energy, forces=forces)
 
 
-def load_xyz(path: str, formatting: str = 'extxyz') -> Configurations:
-    logging.info(f"Loading dataset from '{path}' (format={formatting})")
+def load_xyz(path: str, formatting: str = 'extxyz') -> List[ase.Atoms]:
+    logging.info(f"Loading configurations from '{path}' (format={formatting})")
     atoms_list = ase.io.read(path, ':', format=formatting)
-    configs = [config_from_atoms(atoms) for atoms in atoms_list]
-    logging.info(f'Number of configurations: {len(configs)}')
-    return configs
+    logging.info(f'Loaded {len(atoms_list)} configurations')
+    return atoms_list
