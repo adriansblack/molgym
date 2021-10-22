@@ -23,7 +23,7 @@ class GraphCategoricalDistribution:
 
         # Figure out where to each entry goes in a [num_graphs, max_graph_size] tensor
         num_nodes = logits.shape[0]
-        max_graph_size = torch.max(self.ptr[1:] - self.ptr[:-1])
+        max_graph_size = max(self.ptr[1:] - self.ptr[:-1])
         node_indices = torch.arange(start=0, end=num_nodes, dtype=torch.long)
         target_indices = node_indices - self.ptr[batch] + batch * max_graph_size
 
