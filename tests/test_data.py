@@ -2,7 +2,7 @@ import numpy as np
 import torch_geometric
 
 from molgym.data import Configuration, AtomicData, get_neighborhood
-from molgym.data.geometric_data import atomic_numbers_to_index_array
+from molgym.data.geometric_data import atomic_numbers_to_index_array, build_energy_forces_data
 from molgym.data.tables import AtomicNumberTable
 
 
@@ -32,15 +32,15 @@ class TestAtomicData:
     )
 
     def test_atomic_data(self):
-        data = AtomicData.from_config(self.config, z_table=self.table, cutoff=3.0)
+        data = build_energy_forces_data(self.config, z_table=self.table, cutoff=3.0)
 
         assert data.edge_index.shape == (2, 4)
         assert data.forces.shape == (3, 3)
         assert data.node_attrs.shape == (3, 2)
 
     def test_collate(self):
-        data1 = AtomicData.from_config(self.config, z_table=self.table, cutoff=3.0)
-        data2 = AtomicData.from_config(self.config, z_table=self.table, cutoff=3.0)
+        data1 = build_energy_forces_data(self.config, z_table=self.table, cutoff=3.0)
+        data2 = build_energy_forces_data(self.config, z_table=self.table, cutoff=3.0)
 
         assert torch_geometric.data.DataLoader(dataset=[data1, data2], batch_size=32)
 

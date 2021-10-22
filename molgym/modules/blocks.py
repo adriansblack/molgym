@@ -160,5 +160,5 @@ class MLP(torch.nn.Module):
 
     def __repr__(self):
         layers_str = ", ".join(str(layer) for layer in self.layers)
-        return f"{self.__class__.__name__}(layers={{" + layers_str + f"}}, act={self.gate}, " \
-               f"weights={sum(layer.weight.numel() + layer.bias.numel() for layer in self.layers)})"
+        return (f"{self.__class__.__name__}(layers=[" + layers_str + f"], act={self.gate}, "
+                f"weights={sum(layer.weight.numel() + layer.bias.numel() for layer in self.layers)})")
