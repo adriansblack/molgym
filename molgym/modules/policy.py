@@ -1,12 +1,10 @@
-from typing import Dict, Any
-
 import torch.nn
 from e3nn import o3
 
-from molgym.data import StateActionData
 from molgym.graph_categorical import GraphCategoricalDistribution
 from .blocks import MLP
 from .models import SimpleModel
+from ..data.geometric_data import StateActionBatch
 
 
 class Policy(torch.nn.Module):
@@ -47,7 +45,7 @@ class Policy(torch.nn.Module):
             gate=torch.nn.ReLU(),
         )
 
-    def forward(self, data: StateActionData, sample=False, training=False):
+    def forward(self, data: StateActionBatch):
         s_inter = self.embedding(data)
         s_cov = self.bag_tp(s_inter, data.bag[data.batch])
         s_inv = self.norm(s_cov)
@@ -55,7 +53,12 @@ class Policy(torch.nn.Module):
         focus_logits = self.phi_focus(s_inv).squeeze(-1)  # [n_nodes, ]
         focus_distr = GraphCategoricalDistribution(logits=focus_logits, batch=data.batch, ptr=data.ptr)
 
-        print(focus_distr.sample())
-        print(focus_logits)
+        # Focus
+        if data.focus is not None:
+            focus = data.focus
+        else:
+            focus = focus_distr.sample()
+
+        focused_inv = s_inv[focus + data.ptr[:-1]]
 
         return s_cov, s_inv, focus_logits
