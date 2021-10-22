@@ -108,7 +108,7 @@ def test_trajectory_generation(ethanol):
     assert np.isclose(trajectory[-1].reward, 1.5)
 
     sars_first = trajectory[0]
-    assert len(sars_first.state.atoms) == 0  # canvas is empty
+    assert len(sars_first.state.atoms) == 1  # if canvas is empty, it contains a fake atom
     assert sum(sars_first.state.bag) == len(ethanol)  # bag is full
 
     sars_last = trajectory[-1]

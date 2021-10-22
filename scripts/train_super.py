@@ -2,20 +2,20 @@ import argparse
 import logging
 from typing import Dict
 
+import torch_geometric
+
 from molgym import tools, data
+from molgym.data import graph_tools
 
 
 def add_supervised(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument('--xyz', help='path to XYZ file', type=str, required=True)
-    parser.add_argument('--z_energies',
-                        help='atomic energy of elements (e.g.,: z1:e1, z2:e2, )',
-                        type=str,
-                        required=True)
+    parser.add_argument('--z_energies', help='atomic energy of elements (e.g.,: z1:e1, z2:e2)', type=str, required=True)
     return parser
 
 
 def parse_z_energies(z_energies: str) -> Dict[int, float]:
-    d = {}
+    d = {0: 0.0}
     for item in z_energies.split(','):
         z_str, e_str = item.split(':')
         d[int(z_str)] = float(e_str)
@@ -53,14 +53,33 @@ def main() -> None:
     sars_list = []
     for atoms in atoms_list:
         e_inter = compute_interaction_energy(config=data.config_from_atoms(atoms), z_energies=z_energies)
-        for seed in range(len(atoms) * args.num_paths_per_atom):
+        graph = graph_tools.generate_topology(atoms, cutoff_distance=args.d_max)
+
+        num_paths = max(int(len(atoms) * args.num_paths_per_atom), 1)
+        for seed in range(num_paths):
+            sequence = graph_tools.breadth_first_rollout(graph, seed=seed)
             sars_list += data.generate_sparse_reward_trajectory(
-                atoms=data.reorder_breadth_first(atoms, cutoff_distance=args.d_max, seed=seed),
+                atoms=graph_tools.select_atoms(atoms, sequence),
                 final_reward=e_inter,
                 z_table=z_table,
             )
 
-    print(sars_list[:15])
+    geometric_data = [
+        data.geometric_data_from_state_action_pair(state=item.state,
+                                                   action=item.action,
+                                                   z_table=z_table,
+                                                   cutoff=args.d_max) for item in sars_list
+    ]
+    data_loader = torch_geometric.data.DataLoader(
+        dataset=geometric_data,
+        batch_size=17,
+        shuffle=False,
+        drop_last=False,
+    )
+
+    batch = next(iter(data_loader))
+    for k, v in batch.__dict__.items():
+        print(k, v)
 
 
 if __name__ == '__main__':

@@ -135,7 +135,12 @@ def propagate_discrete_bag_state(state: DiscreteBagState, action: Action,
 def generate_sparse_reward_trajectory(atoms: ase.Atoms, z_table: AtomicNumberTable, final_reward: float) -> Trajectory:
     atoms_list = get_canvases(atoms)
     bags = get_discrete_bags(atoms, z_table)
-    states = [State(atoms=atoms, bag=bag) for atoms, bag in zip(atoms_list, bags)]
+
+    # Add dummy atom if canvas is empty
+    states = [
+        State(atoms=atoms if len(atoms) != 0 else ase.Atoms(symbols='X', positions=[[0.0, 0.0, 0.0]]), bag=bag)
+        for atoms, bag in zip(atoms_list, bags)
+    ]
 
     actions = get_actions(atoms)
     length = len(actions)
