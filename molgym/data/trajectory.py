@@ -12,7 +12,7 @@ from .tables import DiscreteBag, Bag, AtomicNumberTable
 @dataclass
 class Action:
     focus: int
-    z: int
+    element: int
     distance: float
     orientation: Tuple[float, float, float]
 
@@ -91,7 +91,7 @@ def get_actions(atoms: ase.Atoms) -> Sequence[Action]:
     orientations = [get_orientation(canvas=atoms[:t], focus=focuses[t], new_atom=atoms[t]) for t in range(len(atoms))]
 
     return [
-        Action(focus=focus, z=z, distance=distance, orientation=orientation)
+        Action(focus=focus, element=z, distance=distance, orientation=orientation)
         for focus, z, distance, orientation in zip(focuses, zs, distances, orientations)
     ]
 
@@ -127,8 +127,8 @@ def propagate_discrete_bag_state(state: DiscreteBagState, action: Action,
         new_position = state.atoms[action.focus].position + action.distance * np.array(action.orientation)
 
     return DiscreteBagState(
-        atoms=state.atoms.copy() + ase.Atom(symbol=action.z, position=new_position),
-        bag=tables.remove_z_from_bag(action.z, state.bag, z_table),
+        atoms=state.atoms.copy() + ase.Atom(symbol=action.element, position=new_position),
+        bag=tables.remove_z_from_bag(action.element, state.bag, z_table),
     )
 
 

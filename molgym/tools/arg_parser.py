@@ -31,9 +31,12 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
                         help='irreps for hidden node states',
                         type=str,
                         default='16x0e + 16x1o + 16x2e + 16x3o')
+    parser.add_argument('--network_width', help='width of FC layers', type=int, default=128)
+    parser.add_argument('--num_gaussians', help='number of Gaussians in GMM', type=int, default=3)
 
     # Actions
-    parser.add_argument('--d_max', help='maximum distance (in Ang)', type=float, default=1.6)
+    parser.add_argument('--d_min', help='minimum distance (in Ang)', type=float, default=0.9)
+    parser.add_argument('--d_max', help='maximum distance (in Ang)', type=float, default=1.8)
 
     # Path generation
     parser.add_argument('--num_paths_per_atom', help='number of paths per configuration per atom', type=int, default=1)

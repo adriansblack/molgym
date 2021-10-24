@@ -67,10 +67,8 @@ def main() -> None:
             )
 
     geometric_data = [
-        data.build_state_action_data(state=item.state,
-                                     action=item.action,
-                                     z_table=z_table,
-                                     cutoff=args.d_max) for item in sars_list
+        data.build_state_action_data(state=item.state, action=item.action, z_table=z_table, cutoff=args.d_max)
+        for item in sars_list
     ]
     data_loader = torch_geometric.data.DataLoader(
         dataset=geometric_data,
@@ -87,7 +85,9 @@ def main() -> None:
         num_interactions=args.num_interactions,
         num_elements=len(z_table),
         hidden_irreps=o3.Irreps(args.hidden_irreps),
-        network_width=32,
+        network_width=args.network_width,
+        num_gaussians=args.num_gaussians,
+        min_max_distance=(args.d_min, args.d_max)
     )
 
     logging.info(policy)
@@ -95,9 +95,12 @@ def main() -> None:
 
     for batch in data_loader:
         print(batch.num_nodes)
+        print(batch.num_graphs)
+
         output = policy(batch)
-        for o in output:
-            print(o.shape)
+        for k, v in output.items():
+            print(k, v)
+
         break
 
 

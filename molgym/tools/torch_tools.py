@@ -3,26 +3,30 @@ from typing import Dict
 
 import numpy as np
 import torch
+import torch_scatter
 
 TensorDict = Dict[str, torch.Tensor]
 
 
-def to_one_hot(indices: torch.Tensor, num_classes: int, device=None) -> torch.Tensor:
+def to_one_hot(indices: torch.Tensor, num_classes: int) -> torch.Tensor:
     """
     Generates one-hot encoding with <num_classes> classes from <indices>
 
     :param indices: (N x 1) tensor
     :param num_classes: number of classes
-    :param device: torch device
     :return: (N x num_classes) tensor
     """
     shape = indices.shape[:-1] + (num_classes, )
-    oh = torch.zeros(shape, device=device).view(shape)
+    oh = torch.zeros(shape, device=indices.device).view(shape)
 
     # scatter_ is the in-place version of scatter
     oh.scatter_(dim=-1, index=indices, value=1)
 
     return oh.view(*shape)
+
+
+def masked_softmax(logits: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    return torch_scatter.composite.scatter_softmax(src=logits, index=mask.to(torch.long), dim=-1) * mask
 
 
 def count_parameters(module: torch.nn.Module) -> int:

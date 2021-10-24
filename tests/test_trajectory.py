@@ -83,7 +83,7 @@ def rollout_actions(actions: Sequence[Action]) -> ase.Atoms:
         else:
             position = atoms[action.focus].position + action.distance * np.array(action.orientation)
 
-        atoms.append(ase.Atom(symbol=action.z, position=position))
+        atoms.append(ase.Atom(symbol=action.element, position=position))
 
     return atoms
 
@@ -121,10 +121,10 @@ def test_trajectory_generation(ethanol):
 def test_propagate():
     z_table = AtomicNumberTable([1])
     state = DiscreteBagState(atoms=ase.Atoms(), bag=(1, 1, 1))
-    action = Action(focus=0, z=1, distance=1.5, orientation=(1.5, 1.0, 1.2))
+    action = Action(focus=0, element=1, distance=1.5, orientation=(1.5, 1.0, 1.2))
     new_state = propagate_discrete_bag_state(state, action, z_table)
     assert len(new_state.atoms) == 1
 
-    action = Action(focus=0, z=2, distance=1.5, orientation=(1.5, 1.0, 1.2))
+    action = Action(focus=0, element=2, distance=1.5, orientation=(1.5, 1.0, 1.2))
     with pytest.raises(ValueError):
         propagate_discrete_bag_state(state, action, z_table)

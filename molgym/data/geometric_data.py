@@ -66,7 +66,7 @@ class StateActionData(AtomicData):
 
     # Action
     focus: torch.Tensor
-    z: torch.Tensor
+    element: torch.Tensor
     distance: torch.Tensor
     orientation: torch.Tensor
 
@@ -102,7 +102,7 @@ def build_state_action_data(
         bag=torch.tensor([state.bag], dtype=torch.long),
         # Action (optional)
         focus=torch.tensor(action.focus, dtype=torch.long) if action else None,
-        z=torch.tensor(z_table.z_to_index(action.z), dtype=torch.long) if action else None,
+        element=torch.tensor(z_table.z_to_index(action.element), dtype=torch.long) if action else None,
         distance=torch.tensor(action.distance, dtype=torch.get_default_dtype()) if action else None,
         orientation=torch.tensor([action.orientation], dtype=torch.get_default_dtype()) if action else None,
     )
