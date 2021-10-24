@@ -1,4 +1,3 @@
-import itertools
 import queue
 from typing import Sequence
 
@@ -6,20 +5,15 @@ import ase.io
 import networkx as nx
 import numpy as np
 
+from .neighborhood import get_neighborhood
+
 
 def generate_topology(
-    atoms: ase.Atoms,
-    cutoff_distance: float,  # Angstrom
-    node_data=False,
+        atoms: ase.Atoms,
+        cutoff_distance: float,  # Angstrom
 ) -> nx.Graph:
-    graph = nx.Graph()
-
-    if node_data:
-        graph.add_nodes_from((i, {'z': atom.z, 'position': atom.position}) for i, atom in enumerate(atoms))
-
-    for (i, a_i), (j, a_j) in itertools.combinations(list(enumerate(atoms)), 2):
-        if np.linalg.norm(a_i.position - a_j.position) < cutoff_distance:
-            graph.add_edge(i, j)
+    edge_index, _shifts = get_neighborhood(positions=atoms.positions, cutoff=cutoff_distance, pbc=None)
+    graph = nx.from_edgelist(edge_index.transpose())
 
     assert nx.is_connected(graph)
     assert len(graph) == len(atoms)

@@ -67,13 +67,6 @@ def test_disjoint_graph(ethanol):
         generate_topology(ethanol, cutoff_distance=1.0)
 
 
-def test_graph_data(ethanol):
-    graph = generate_topology(ethanol, cutoff_distance=1.6, node_data=True)
-    for atom, (_, node_data) in zip(ethanol, graph.nodes(data=True)):
-        assert atom.z == node_data['z']
-        assert np.allclose(atom.position, node_data['position'])
-
-
 def rollout_actions(actions: Sequence[Action]) -> ase.Atoms:
     atoms = ase.Atoms()
 
