@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Any, Dict
 
 import numpy as np
 import torch.nn
@@ -7,9 +7,12 @@ from e3nn import o3
 from molgym.data import StateActionBatch
 from molgym.gmm import GaussianMixtureModel
 from molgym.graph_categorical import GraphCategoricalDistribution
-from molgym.tools import masked_softmax, TensorDict, to_one_hot
+from molgym.spherical_distrs import SO3Distribution
+from molgym.tools import masked_softmax, to_one_hot
 from .blocks import MLP
+from .irreps_tools import tp_out_irreps_with_instructions
 from .models import SimpleModel
+from .radial import BesselBasis
 
 
 class Policy(torch.nn.Module):
@@ -46,8 +49,8 @@ class Policy(torch.nn.Module):
         self.norm = o3.Norm(irreps_in=self.cov_irreps)
         self.inv_dim = self.norm.irreps_out.dim
 
-        self.bag_tp = o3.FullyConnectedTensorProduct(self.cov_irreps, o3.Irreps(f'{self.num_elements}x0e'),
-                                                     self.cov_irreps)
+        z_irreps = o3.Irreps(f'{self.num_elements}x0e')
+        self.bag_tp = o3.FullyConnectedTensorProduct(self.cov_irreps, z_irreps, self.cov_irreps)
 
         # Focus
         self.phi_focus = MLP(
@@ -76,8 +79,17 @@ class Policy(torch.nn.Module):
         self.d_log_stds = torch.nn.Parameter(torch.tensor([np.log(0.1)] * self.num_gaussians), requires_grad=True)
 
         # Orientation
+        self.bessel_fn = BesselBasis(r_max=max_distance, num_basis=num_bessel)
+        irreps_mid, instructions = tp_out_irreps_with_instructions(self.cov_irreps, z_irreps, self.cov_irreps)
+        self.mix_tp = o3.TensorProduct(self.cov_irreps,
+                                       z_irreps,
+                                       irreps_out=irreps_mid,
+                                       instructions=instructions,
+                                       shared_weights=False,
+                                       internal_weights=False)
+        self.mix_tp_weights = o3.Linear(o3.Irreps(f'{num_bessel}x0e'), o3.Irreps(f'{self.mix_tp.weight_numel}x0e'))
 
-    def forward(self, data: StateActionBatch) -> TensorDict:
+    def forward(self, data: StateActionBatch) -> Dict[str, Any]:
         s_inter = self.embedding(data)
         s_cov = self.bag_tp(s_inter, data.bag[data.batch])
         s_inv = self.norm(s_cov)
@@ -120,6 +132,9 @@ class Policy(torch.nn.Module):
             distance = d_distr.sample()
 
         # Orientation
+        tp_weights = self.mix_tp_weights(self.bessel_fn(distance.unsqueeze(-1)))
+        cond_cov = self.mix_tp(focused_cov, element_oh, tp_weights)  # [n_graphs, irreps]
+        spherical_distr = SO3Distribution(cond_cov, lmax=3, gamma=1.0)
 
         # Log probs
         log_prob_list = [
