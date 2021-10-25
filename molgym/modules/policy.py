@@ -2,12 +2,12 @@ from typing import Tuple, Any, Dict
 
 import numpy as np
 import torch.nn
+import torch_scatter
 from e3nn import o3
 
 from molgym.data import StateActionBatch
-from molgym.gmm import GaussianMixtureModel
-from molgym.graph_categorical import GraphCategoricalDistribution
-from molgym.spherical_distrs import SO3Distribution
+from molgym.distributions import (GaussianMixtureModel, GraphCategoricalDistribution, SO3Distribution,
+                                  compute_ef_cond_entropy)
 from molgym.tools import masked_softmax, to_one_hot
 from .blocks import MLP
 from .irreps_tools import get_merge_instructions
@@ -99,7 +99,8 @@ class Policy(torch.nn.Module):
         s_inv = self.norm(s_cov)
 
         focus_logits = self.phi_focus(s_inv).squeeze(-1)  # [n_nodes, ]
-        focus_distr = GraphCategoricalDistribution(logits=focus_logits, batch=data.batch, ptr=data.ptr)
+        focus_probs = torch_scatter.scatter_softmax(src=focus_logits, index=data.batch, dim=-1)  # [num_nodes,]
+        focus_distr = GraphCategoricalDistribution(probs=focus_probs, batch=data.batch, ptr=data.ptr)
 
         # Focus
         if data.focus is not None:
@@ -107,13 +108,11 @@ class Policy(torch.nn.Module):
         else:
             focus = focus_distr.sample()
 
-        focused_cov = s_cov[focus + data.ptr[:-1]]
-        focused_inv = s_inv[focus + data.ptr[:-1]]
-
         # Element
-        element_logits = self.phi_element(focused_inv)  # [n_graphs, n_zs]
-        element_probs = masked_softmax(element_logits, mask=(data.bag > 0))  # [n_graphs, n_zs]
-        element_distr = torch.distributions.Categorical(probs=element_probs)
+        all_element_logits = self.phi_element(s_inv)  # [n_nodes, n_z]
+        all_element_probs = masked_softmax(all_element_logits, mask=(data.bag > 0)[data.batch])  # [n_nodes, n_z]
+        focused_element_probs = all_element_probs[focus + data.ptr[:-1]]  # [n_graphs, n_z]
+        element_distr = torch.distributions.Categorical(probs=focused_element_probs)
 
         if data.element is not None:
             element = data.element
@@ -123,7 +122,8 @@ class Policy(torch.nn.Module):
         element_oh = to_one_hot(element.unsqueeze(-1), num_classes=self.num_elements)
 
         # Distance
-        d_input = torch.cat([focused_inv, element_oh], dim=-1)  # [n_graphs, n_hidden + n_zs]
+        focused_inv = s_inv[focus + data.ptr[:-1]]
+        d_input = torch.cat([focused_inv, element_oh], dim=-1)  # [n_graphs, n_hidden + n_z]
         gmm_log_probs, d_mean_trans = self.phi_distance(d_input).split(self.num_gaussians, dim=-1)
         d_mean = torch.tanh(d_mean_trans) * self.d_half_width + self.d_center
         d_distr = GaussianMixtureModel(log_probs=gmm_log_probs,
@@ -136,6 +136,7 @@ class Policy(torch.nn.Module):
             distance = d_distr.sample()
 
         # Orientation
+        focused_cov = s_cov[focus + data.ptr[:-1]]
         tp_weights = self.mix_tp_weights(self.bessel_fn(distance.unsqueeze(-1)))
         cond_cov = self.mix_tp(focused_cov, element_oh, tp_weights)  # [n_graphs, irreps]
         spherical_distr = SO3Distribution(cond_cov, lmax=self.ell_max, gamma=self.gamma)
@@ -154,11 +155,22 @@ class Policy(torch.nn.Module):
         ]
         log_prob = torch.stack(log_prob_list, dim=-1).sum(dim=-1)  # [n_graphs, ]
 
+        # Entropy
+        entropy_list = [
+            focus_distr.entropy(),
+            compute_ef_cond_entropy(focus_probs=focus_probs,
+                                    element_probs=all_element_probs,
+                                    batch=data.batch,
+                                    num_graphs=data.num_graphs),
+        ]
+        entropy = torch.stack(entropy_list, dim=-1).sum(dim=-1)  # [n_graphs, ]
+
         return {
             'focus': focus,
             'element': element,
             'distance': distance,
             'orientation': orientation,
             'logp': log_prob,
+            'entropy': entropy,
             'distrs': [focus_distr, element_distr, d_distr, spherical_distr],
         }

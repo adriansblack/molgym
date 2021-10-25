@@ -49,7 +49,7 @@ def main() -> None:
     logging.info(z_table)
 
     # Load atoms list
-    atoms_list = data.load_xyz(args.xyz)
+    atoms_list = data.load_xyz(args.xyz)[:17]
 
     # Generate SARS list
     sars_list = []

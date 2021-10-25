@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from molgym.spherical_distrs import SphericalUniform, SO3Distribution, generate_fibonacci_grid
+from molgym.distributions.spherical_distrs import SphericalUniform, SO3Distribution, generate_fibonacci_grid
 from molgym.tools import to_numpy
 
 

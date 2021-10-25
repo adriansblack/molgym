@@ -3,7 +3,7 @@ import plotly.graph_objects as go
 import torch
 from e3nn import o3
 
-from molgym.spherical_distrs import SO3Distribution
+from molgym.distributions.spherical_distrs import SO3Distribution
 from molgym.tools import set_seeds
 
 

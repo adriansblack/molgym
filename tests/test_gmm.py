@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from molgym.gmm import GaussianMixtureModel
+from molgym.distributions import GaussianMixtureModel
 from molgym.tools import to_numpy
 
 

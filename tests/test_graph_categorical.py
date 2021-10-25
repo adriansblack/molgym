@@ -1,8 +1,9 @@
 import numpy as np
 import torch.utils.data
 import torch_geometric
+import torch_scatter
 
-from molgym.graph_categorical import GraphCategoricalDistribution
+from molgym.distributions import GraphCategoricalDistribution
 
 
 class TestData(torch_geometric.data.Data):
@@ -55,7 +56,8 @@ def test_standard():
         dtype=torch.float,
         requires_grad=True)  # [num_nodes,]
 
-    distr = GraphCategoricalDistribution(logits=logits, batch=batch.batch, ptr=batch.ptr)
+    probs = torch_scatter.scatter_softmax(src=logits, index=batch.batch, dim=-1)  # [num_nodes,]
+    distr = GraphCategoricalDistribution(probs=probs, batch=batch.batch, ptr=batch.ptr)
     assert distr.num_graphs == 4
     assert distr.num_nodes == 8
 
