@@ -61,7 +61,7 @@ def test_softmax():
     logits = torch.from_numpy(np.array([
         [0.5, 0.5],
         [1.0, 0.5],
-    ], dtype=np.float))
+    ], dtype=float))
 
     mask_1 = torch.ones(size=logits.shape, dtype=torch.bool)
 
@@ -69,7 +69,7 @@ def test_softmax():
     assert y1.shape, (2, 2)
     assert np.isclose(y1.sum().item(), 2.0)
 
-    mask_2 = torch.from_numpy(np.array([[1, 0], [1, 0]], dtype=np.bool))
+    mask_2 = torch.from_numpy(np.array([[1, 0], [1, 0]], dtype=bool))
     y2 = masked_softmax(logits=logits, mask=mask_2)
 
     total = y2.sum(dim=0, keepdim=False)
