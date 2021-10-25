@@ -24,7 +24,8 @@ def tp_out_irreps_with_instructions(irreps1: o3.Irreps, irreps2: o3.Irreps, targ
     irreps_out = o3.Irreps(irreps_out_list)
     irreps_out, permut, _ = irreps_out.sort()
 
-    # Permute the output indexes of the instructions to match the sorted irreps:
+    # Permute the output indexes of the instructions to match the sorted irreps
+    # The order of the instructions does not matter
     instructions = [(i_in1, i_in2, permut[i_out], mode, train) for i_in1, i_in2, i_out, mode, train in instructions]
 
     return irreps_out, instructions
@@ -46,3 +47,18 @@ def linear_out_irreps(irreps: o3.Irreps, target_irreps: o3.Irreps) -> o3.Irreps:
             raise RuntimeError(f'{ir_in} not in {target_irreps}')
 
     return o3.Irreps(irreps_mid)
+
+
+def get_merge_instructions(irreps1: o3.Irreps, irreps2: o3.Irreps, irreps_out: o3.Irreps) -> List:
+    trainable = True
+    assert len(irreps_out) == len(set(k.ir for k in irreps_out))
+    index = {k.ir: i for i, k in enumerate(irreps_out)}
+
+    instructions = []
+    for i, (_, ir_in) in enumerate(irreps1):
+        for j, (_, ir_edge) in enumerate(irreps2):
+            for ir_out in ir_in * ir_edge:  # | l1 - l2 | <= l <= l1 + l2
+                if ir_out in irreps_out:
+                    instructions.append((i, j, index[ir_out], 'uvw', trainable))
+
+    return instructions

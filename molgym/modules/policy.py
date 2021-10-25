@@ -10,7 +10,7 @@ from molgym.graph_categorical import GraphCategoricalDistribution
 from molgym.spherical_distrs import SO3Distribution
 from molgym.tools import masked_softmax, to_one_hot
 from .blocks import MLP
-from .irreps_tools import tp_out_irreps_with_instructions
+from .irreps_tools import get_merge_instructions
 from .models import SimpleModel
 from .radial import BesselBasis
 
@@ -28,10 +28,13 @@ class Policy(torch.nn.Module):
         network_width: int,
         num_gaussians: int,
         min_max_distance: Tuple[float, float],
+        gamma: float,
     ):
         super().__init__()
 
         self.num_elements = num_elements
+        self.ell_max = max_ell
+        self.gamma = gamma
 
         # Embedding
         self.embedding = SimpleModel(
@@ -80,10 +83,11 @@ class Policy(torch.nn.Module):
 
         # Orientation
         self.bessel_fn = BesselBasis(r_max=max_distance, num_basis=num_bessel)
-        irreps_mid, instructions = tp_out_irreps_with_instructions(self.cov_irreps, z_irreps, self.cov_irreps)
+        sph_irreps = o3.Irreps.spherical_harmonics(self.ell_max)
+        instructions = get_merge_instructions(self.cov_irreps, z_irreps, sph_irreps)
         self.mix_tp = o3.TensorProduct(self.cov_irreps,
                                        z_irreps,
-                                       irreps_out=irreps_mid,
+                                       irreps_out=sph_irreps,
                                        instructions=instructions,
                                        shared_weights=False,
                                        internal_weights=False)
@@ -134,13 +138,19 @@ class Policy(torch.nn.Module):
         # Orientation
         tp_weights = self.mix_tp_weights(self.bessel_fn(distance.unsqueeze(-1)))
         cond_cov = self.mix_tp(focused_cov, element_oh, tp_weights)  # [n_graphs, irreps]
-        spherical_distr = SO3Distribution(cond_cov, lmax=3, gamma=1.0)
+        spherical_distr = SO3Distribution(cond_cov, lmax=self.ell_max, gamma=self.gamma)
+
+        if data.orientation is not None:
+            orientation = data.orientation
+        else:
+            orientation = spherical_distr.sample()
 
         # Log probs
         log_prob_list = [
             focus_distr.log_prob(focus),
             element_distr.log_prob(element),
             d_distr.log_prob(distance),
+            spherical_distr.log_prob(orientation),
         ]
         log_prob = torch.stack(log_prob_list, dim=-1).sum(dim=-1)  # [n_graphs, ]
 
@@ -148,6 +158,7 @@ class Policy(torch.nn.Module):
             'focus': focus,
             'element': element,
             'distance': distance,
+            'orientation': orientation,
             'logp': log_prob,
-            'distrs': [focus_distr, element_distr, d_distr],
+            'distrs': [focus_distr, element_distr, d_distr, spherical_distr],
         }
