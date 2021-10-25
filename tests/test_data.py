@@ -1,7 +1,7 @@
 import numpy as np
 import torch_geometric
 
-from molgym.data import Configuration, AtomicData, get_neighborhood
+from molgym.data import Configuration, get_neighborhood
 from molgym.data.geometric_data import atomic_numbers_to_index_array, build_energy_forces_data
 from molgym.data.tables import AtomicNumberTable
 
