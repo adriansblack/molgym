@@ -75,7 +75,7 @@ def main() -> None:
     logging.info(f'Training data: {len(train_data)}, valid data: {len(valid_data)}')
 
     train_loader, valid_loader = [
-        torch_geometric.data.DataLoader(
+        torch_geometric.loader.DataLoader(
             dataset=dataset,
             batch_size=args.batch_size,
             shuffle=True,
