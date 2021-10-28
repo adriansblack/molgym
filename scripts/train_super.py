@@ -96,6 +96,7 @@ def main() -> None:
         min_max_distance=(args.d_min, args.d_max),
         gamma=10.0,
     )
+    policy.to(device)
 
     optimizer = torch.optim.AdamW(
         params=policy.parameters(),

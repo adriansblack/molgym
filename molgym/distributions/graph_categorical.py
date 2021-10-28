@@ -19,10 +19,10 @@ class GraphCategoricalDistribution:
         # Figure out where to each entry goes in a [num_graphs, max_graph_size] tensor
         num_nodes = probs.shape[0]
         max_graph_size = max(ptr[1:] - ptr[:-1])
-        node_indices = torch.arange(start=0, end=num_nodes, dtype=torch.long)
+        node_indices = torch.arange(start=0, end=num_nodes, dtype=torch.long, device=probs.device)
         target_indices = node_indices - ptr[batch] + batch * max_graph_size
 
-        zeroes = torch.zeros(size=(self.num_graphs * max_graph_size, ), dtype=probs.dtype)
+        zeroes = torch.zeros(size=(self.num_graphs * max_graph_size, ), dtype=probs.dtype, device=probs.device)
         probs_matrix = torch.scatter(input=zeroes, dim=-1, index=target_indices, src=probs)
         probs_matrix = probs_matrix.reshape(self.num_graphs, max_graph_size)  # [num_graphs, max_graph_size]
 
