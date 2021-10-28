@@ -8,7 +8,7 @@ from e3nn import o3
 from molgym.data import StateActionBatch
 from molgym.distributions import (GaussianMixtureModel, GraphCategoricalDistribution, SO3Distribution,
                                   compute_ef_cond_entropy)
-from molgym.tools import masked_softmax, to_one_hot
+from molgym.tools import masked_softmax, to_one_hot, TensorDict
 from .blocks import MLP
 from .irreps_tools import get_merge_instructions
 from .models import SimpleModel
@@ -93,7 +93,7 @@ class Policy(torch.nn.Module):
                                        internal_weights=False)
         self.mix_tp_weights = o3.Linear(o3.Irreps(f'{num_bessel}x0e'), o3.Irreps(f'{self.mix_tp.weight_numel}x0e'))
 
-    def forward(self, data: StateActionBatch) -> Dict[str, Any]:
+    def forward(self, data: StateActionBatch) -> Tuple[TensorDict, Dict[str, Any]]:
         s_inter = self.embedding(data)
         s_cov = self.bag_tp(s_inter, data.bag[data.batch])
         s_inv = self.norm(s_cov)
@@ -165,12 +165,16 @@ class Policy(torch.nn.Module):
         ]
         entropy = torch.stack(entropy_list, dim=-1).sum(dim=-1)  # [n_graphs, ]
 
-        return {
+        response = {
             'focus': focus,
             'element': element,
             'distance': distance,
             'orientation': orientation,
             'logp': log_prob,
             'entropy': entropy,
+        }
+        aux = {
             'distrs': [focus_distr, element_distr, d_distr, spherical_distr],
         }
+
+        return response, aux

@@ -2,7 +2,7 @@ import json
 import logging
 import os
 import sys
-from typing import Iterable, Union, Optional, Dict, Any
+from typing import Iterable, Union, Optional, Dict, Any, Sequence, Tuple, List
 
 import numpy as np
 import torch
@@ -69,3 +69,16 @@ class ProgressLogger:
         with open(self.path, mode='a') as f:
             f.write(json.dumps(d, cls=UniversalEncoder))
             f.write('\n')
+
+
+def random_train_valid_split(items: Sequence, valid_fraction: float, seed: int) -> Tuple[List, List]:
+    assert 0.0 < valid_fraction < 1.0
+
+    size = len(items)
+    train_size = size - int(valid_fraction * size)
+
+    indices = list(range(size))
+    rng = np.random.default_rng(seed)
+    rng.shuffle(indices)
+
+    return [items[i] for i in indices[:train_size]], [items[i] for i in indices[train_size:]]

@@ -2,12 +2,13 @@ import argparse
 import logging
 from typing import Dict
 
+import numpy as np
+import torch
 import torch_geometric
 from e3nn import o3
 
-from molgym import tools, data
+from molgym import tools, data, modules
 from molgym.data import graph_tools
-from molgym.modules import Policy
 
 
 def add_supervised(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
@@ -49,7 +50,7 @@ def main() -> None:
     logging.info(z_table)
 
     # Load atoms list
-    atoms_list = data.load_xyz(args.xyz)[:17]
+    atoms_list = data.load_xyz(args.xyz)
 
     # Generate SARS list
     sars_list = []
@@ -57,8 +58,7 @@ def main() -> None:
         e_inter = compute_interaction_energy(config=data.config_from_atoms(atoms), z_energies=z_energies)
         graph = graph_tools.generate_topology(atoms, cutoff_distance=args.d_max)
 
-        num_paths = max(int(len(atoms) * args.num_paths_per_atom), 1)
-        for seed in range(num_paths):
+        for seed in range(args.num_paths_per_config):
             sequence = graph_tools.breadth_first_rollout(graph, seed=seed)
             sars_list += data.generate_sparse_reward_trajectory(
                 atoms=graph_tools.select_atoms(atoms, sequence),
@@ -70,14 +70,20 @@ def main() -> None:
         data.build_state_action_data(state=item.state, action=item.action, z_table=z_table, cutoff=args.d_max)
         for item in sars_list
     ]
-    data_loader = torch_geometric.data.DataLoader(
-        dataset=geometric_data,
-        batch_size=17,
-        shuffle=False,
-        drop_last=False,
-    )
 
-    policy = Policy(
+    train_data, valid_data = tools.random_train_valid_split(geometric_data, valid_fraction=0.1, seed=1)
+    logging.info(f'Training data: {len(train_data)}, valid data: {len(valid_data)}')
+
+    train_loader, valid_loader = [
+        torch_geometric.data.DataLoader(
+            dataset=dataset,
+            batch_size=args.batch_size,
+            shuffle=True,
+            drop_last=True,
+        ) for dataset in (train_data, valid_data)
+    ]
+
+    policy = modules.Policy(
         r_max=args.r_max,
         num_bessel=args.num_radial_basis,
         num_polynomial_cutoff=args.num_cutoff_basis,
@@ -88,21 +94,42 @@ def main() -> None:
         network_width=args.network_width,
         num_gaussians=args.num_gaussians,
         min_max_distance=(args.d_min, args.d_max),
-        gamma=10.0
+        gamma=10.0,
     )
+
+    optimizer = torch.optim.AdamW(
+        params=policy.parameters(),
+        lr=args.lr,
+        amsgrad=True,
+    )
+    lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=args.lr_scheduler_gamma)
+    checkpoint_handler = tools.CheckpointHandler(directory=args.checkpoints_dir, tag=tag, keep=args.keep_checkpoints)
+    logger = tools.ProgressLogger(directory=args.log_dir, tag=tag + '_train')
+
+    start_epoch = 0
+    if args.restart_latest:
+        start_epoch = checkpoint_handler.load_latest(state=tools.CheckpointState(policy, optimizer, lr_scheduler),
+                                                     device=device)
 
     logging.info(policy)
     logging.info(f'Number of parameters: {tools.count_parameters(policy)}')
+    logging.info(f'Optimizer: {optimizer}')
 
-    for batch in data_loader:
-        print(batch.num_nodes)
-        print(batch.num_graphs)
-
-        output = policy(batch)
-        for k, v in output.items():
-            print(k, v)
-
-        break
+    tools.train(
+        model=policy,
+        loss_fn=tools.neg_log_likelihood,
+        train_loader=train_loader,
+        valid_loader=valid_loader,
+        optimizer=optimizer,
+        lr_scheduler=lr_scheduler,
+        checkpoint_handler=checkpoint_handler,
+        eval_interval=args.eval_interval,
+        start_epoch=start_epoch,
+        max_num_epochs=args.max_num_epochs,
+        logger=logger,
+        patience=np.inf,
+        device=device,
+    )
 
 
 if __name__ == '__main__':
