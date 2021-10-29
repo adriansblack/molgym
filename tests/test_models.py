@@ -38,7 +38,7 @@ def test_bo_model():
     assert tools.count_parameters(model) == 3164
 
     atomic_data = data.build_energy_forces_data(config, z_table=table, cutoff=3.0)
-    data_loader = torch_geometric.data.DataLoader([atomic_data, atomic_data], batch_size=2)
+    data_loader = torch_geometric.loader.DataLoader([atomic_data, atomic_data], batch_size=2)
     batch = next(iter(data_loader))
 
     output = model(batch)

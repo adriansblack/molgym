@@ -22,15 +22,17 @@ def test_save_load():
     model = MyModel()
     initial_lr = 0.001
     optimizer = optim.SGD(model.parameters(), lr=initial_lr, momentum=0.9)
+    lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.99)
 
     with tempfile.TemporaryDirectory() as directory:
         handler = CheckpointHandler(directory=directory, tag='test', keep=True)
-        handler.save(state=CheckpointState(model, optimizer), epochs=50)
+        handler.save(state=CheckpointState(model, optimizer, lr_scheduler), epochs=50)
 
         optimizer.step()
-        assert np.isclose(optimizer.param_groups[0]['lr'], initial_lr)
+        lr_scheduler.step()
+        assert not np.isclose(optimizer.param_groups[0]['lr'], initial_lr)
 
-        handler.load_latest(state=CheckpointState(model, optimizer))
+        handler.load_latest(state=CheckpointState(model, optimizer, lr_scheduler))
         assert np.isclose(optimizer.param_groups[0]['lr'], initial_lr)
 
 

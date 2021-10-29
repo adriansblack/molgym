@@ -42,7 +42,7 @@ class TestAtomicData:
         data1 = build_energy_forces_data(self.config, z_table=self.table, cutoff=3.0)
         data2 = build_energy_forces_data(self.config, z_table=self.table, cutoff=3.0)
 
-        assert torch_geometric.data.DataLoader(dataset=[data1, data2], batch_size=32)
+        assert torch_geometric.loader.DataLoader(dataset=[data1, data2], batch_size=32)
 
 
 def test_neighborhood_basics():

@@ -6,30 +6,28 @@ import torch_scatter
 from molgym.distributions import GraphCategoricalDistribution
 
 
-class TestData(torch_geometric.data.Data):
-    def __init__(
-            self,
-            num_nodes: int,
-            edge_index: torch.Tensor,  # [2, n_edges]
-    ):
-        assert edge_index.shape[0] == 2 and len(edge_index.shape) == 2
-        super().__init__(
-            num_nodes=num_nodes,
-            edge_index=edge_index,
-        )
+def generate_test_data(
+        num_nodes: int,
+        edge_index: torch.Tensor,  # [2, n_edges]
+) -> torch_geometric.data.Data:
+    assert edge_index.shape[0] == 2 and len(edge_index.shape) == 2
+    return torch_geometric.data.Data(
+        num_nodes=num_nodes,
+        edge_index=edge_index,
+    )
 
 
 def test_standard():
     torch.manual_seed(1)
 
     graphs = [
-        TestData(edge_index=torch.tensor([[0], [1]], dtype=torch.long), num_nodes=2),
-        TestData(edge_index=torch.tensor([[0, 0], [1, 2]], dtype=torch.long), num_nodes=3),
-        TestData(edge_index=torch.tensor([[], []], dtype=torch.long), num_nodes=1),
-        TestData(edge_index=torch.tensor([[0], [1]], dtype=torch.long), num_nodes=2),
+        generate_test_data(edge_index=torch.tensor([[0], [1]], dtype=torch.long), num_nodes=2),
+        generate_test_data(edge_index=torch.tensor([[0, 0], [1, 2]], dtype=torch.long), num_nodes=3),
+        generate_test_data(edge_index=torch.tensor([[], []], dtype=torch.long), num_nodes=1),
+        generate_test_data(edge_index=torch.tensor([[0], [1]], dtype=torch.long), num_nodes=2),
     ]
 
-    data_loader = torch_geometric.data.DataLoader(
+    data_loader = torch_geometric.loader.DataLoader(
         dataset=graphs,
         batch_size=len(graphs),
         shuffle=False,
