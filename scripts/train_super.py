@@ -101,6 +101,7 @@ def main() -> None:
     optimizer = torch.optim.AdamW(
         params=policy.parameters(),
         lr=args.lr,
+        weight_decay=args.weight_decay,
         amsgrad=True,
     )
     lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=args.lr_scheduler_gamma)
