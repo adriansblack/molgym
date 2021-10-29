@@ -58,7 +58,8 @@ def main() -> None:
         e_inter = compute_interaction_energy(config=data.config_from_atoms(atoms), z_energies=z_energies)
         graph = graph_tools.generate_topology(atoms, cutoff_distance=args.d_max)
 
-        for seed in range(args.num_paths_per_config):
+        num_paths = max(int(args.num_paths_per_atom * len(atoms)), 1)
+        for seed in range(num_paths):
             sequence = graph_tools.breadth_first_rollout(graph, seed=seed)
             sars_list += data.generate_sparse_reward_trajectory(
                 atoms=graph_tools.select_atoms(atoms, sequence),

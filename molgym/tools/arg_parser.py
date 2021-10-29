@@ -39,7 +39,7 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument('--lr', help='Learning rate of optimizer', type=float, default=0.001)
     parser.add_argument('--lr_scheduler_gamma', help='Gamma of learning rate scheduler', type=float, default=0.9993)
     parser.add_argument('--weight_decay', help='weight decay (L2 penalty)', type=float, default=5e-5)
-    parser.add_argument('--max_num_epochs', help='Maximum number of epochs', type=int, default=2048)
+    parser.add_argument('--max_num_epochs', help='Maximum number of epochs', type=int, default=128)
     parser.add_argument('--eval_interval', help='evaluate model every <n> epochs', type=int, default=2)
     parser.add_argument('--keep_checkpoints', help='keep all checkpoints', action='store_true', default=False)
     parser.add_argument('--restart_latest',
@@ -52,6 +52,9 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument('--d_max', help='maximum distance (in Ang)', type=float, default=1.8)
 
     # Path generation
-    parser.add_argument('--num_paths_per_config', help='number of paths per configuration', type=int, default=1)
+    parser.add_argument('--num_paths_per_atom',
+                        help='number of paths per atom in configuration',
+                        type=float,
+                        default=0.5)
 
     return parser
