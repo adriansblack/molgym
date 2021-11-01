@@ -76,7 +76,9 @@ class Policy(torch.nn.Module):
             output_dims=(network_width, 2 * self.num_gaussians),
             gate=torch.nn.ReLU(),
         )
-        min_distance, max_distance = min_max_distance
+
+        self.min_max_distance = min_max_distance
+        min_distance, max_distance = self.min_max_distance
         self.d_center = torch.tensor((min_distance + max_distance) / 2)
         self.d_half_width = torch.tensor((max_distance - min_distance) / 2)
         self.d_log_stds = torch.nn.Parameter(torch.tensor([np.log(0.1)] * self.num_gaussians), requires_grad=True)
