@@ -139,7 +139,8 @@ def main() -> None:
 
     policy_path = os.path.join(args.checkpoints_dir, tag + '.model')
     logging.info(f'Saving policy to {policy_path}')
-    torch.save(policy, policy_path)
+    policy_cpu = policy.to(torch.device('cpu'))
+    torch.save(policy_cpu, policy_path)
 
     logging.info('Done')
 
