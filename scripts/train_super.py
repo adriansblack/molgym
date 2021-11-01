@@ -1,5 +1,6 @@
 import argparse
 import logging
+import os
 from typing import Dict
 
 import numpy as np
@@ -135,6 +136,12 @@ def main() -> None:
         patience=np.inf,
         device=device,
     )
+
+    policy_path = os.path.join(args.checkpoints_dir, tag + '.model')
+    logging.info(f'Saving policy to {policy_path}')
+    torch.save(policy, policy_path)
+
+    logging.info('Done')
 
 
 if __name__ == '__main__':
