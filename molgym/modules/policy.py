@@ -105,7 +105,7 @@ class Policy(torch.nn.Module):
         focus_distr = GraphCategoricalDistribution(probs=focus_probs, batch=data.batch, ptr=data.ptr)
 
         # Focus
-        if data.focus is not None:
+        if hasattr(data, 'focus') and data.focus is not None:
             focus = data.focus
         else:
             focus = focus_distr.sample()
@@ -116,7 +116,7 @@ class Policy(torch.nn.Module):
         focused_element_probs = all_element_probs[focus + data.ptr[:-1]]  # [n_graphs, n_z]
         element_distr = torch.distributions.Categorical(probs=focused_element_probs)
 
-        if data.element is not None:
+        if hasattr(data, 'element') and data.element is not None:
             element = data.element
         else:
             element = element_distr.sample()
@@ -132,7 +132,7 @@ class Policy(torch.nn.Module):
                                        means=d_mean,
                                        stds=torch.exp(self.d_log_stds).clamp(min=1e-6))
 
-        if data.distance is not None:
+        if hasattr(data, 'distance') and data.distance is not None:
             distance = data.distance
         else:
             distance = d_distr.sample()
@@ -143,7 +143,7 @@ class Policy(torch.nn.Module):
         cond_cov = self.mix_tp(focused_cov, element_oh, tp_weights)  # [n_graphs, irreps]
         spherical_distr = SO3Distribution(cond_cov, lmax=self.ell_max, gamma=self.gamma)
 
-        if data.orientation is not None:
+        if hasattr(data, 'orientation') and data.orientation is not None:
             orientation = data.orientation
         else:
             orientation = spherical_distr.sample()
