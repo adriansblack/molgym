@@ -16,6 +16,11 @@ def add_supervised(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument('--xyz', help='path to XYZ file', type=str, required=True)
     parser.add_argument('--max_num_configs', help='maximum number of samples', type=int, required=False, default=None)
     parser.add_argument('--z_energies', help='atomic energy of elements (e.g.,: z1:e1, z2:e2)', type=str, required=True)
+    parser.add_argument('--num_sampled_trajectories',
+                        help='number of sampled trajectories',
+                        type=int,
+                        required=False,
+                        default=10)
     return parser
 
 
@@ -107,8 +112,7 @@ def main() -> None:
             seed += 1
 
     geometric_data = [
-        data.build_state_action_data(state=item.state, cutoff=args.d_max, action=item.action)
-        for item in sars_list
+        data.build_state_action_data(state=item.state, cutoff=args.d_max, action=item.action) for item in sars_list
     ]
 
     train_data, valid_data = tools.random_train_valid_split(geometric_data, valid_fraction=0.1, seed=1)
@@ -174,7 +178,10 @@ def main() -> None:
     )
 
     initial_state = data.get_initial_state(atoms=atoms_list[0], z_table=z_table)
-    terminals = sample_trajectories(policy, initial_state=initial_state, cutoff=args.d_max, count=2)
+    terminals = sample_trajectories(policy,
+                                    initial_state=initial_state,
+                                    cutoff=args.d_max,
+                                    count=args.num_sampled_trajectories)
     terminal_atoms = [data.state_to_atoms(terminal_state, z_table) for terminal_state in terminals]
     ase.io.write(os.path.join(args.log_dir, tag + '_terminals.xyz'), terminal_atoms, format='extxyz')
 
