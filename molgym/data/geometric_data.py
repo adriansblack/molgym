@@ -8,7 +8,7 @@ from molgym.tools import to_one_hot
 from .neighborhood import get_neighborhood
 from .tables import AtomicNumberTable
 from .trajectory import State, Action
-from .utils import config_from_atoms, Configuration
+from .utils import Configuration
 
 
 def atomic_numbers_to_index_array(atomic_numbers: np.ndarray, z_table: AtomicNumberTable) -> np.ndarray:
@@ -75,34 +75,26 @@ class StateActionBatch(torch_geometric.data.Batch, StateActionData):
     pass
 
 
-def build_state_action_data(
-    state: State,
-    z_table: AtomicNumberTable,
-    cutoff: float,
-    action: Optional[Action] = None,
-) -> StateActionData:
-    config = config_from_atoms(state.atoms)
+def build_state_action_data(state: State, cutoff: float, action: Optional[Action] = None) -> StateActionData:
+    edge_index, shifts = get_neighborhood(positions=state.positions, cutoff=cutoff)
 
-    edge_index, shifts = get_neighborhood(positions=config.positions, cutoff=cutoff)
-
-    indices = atomic_numbers_to_index_array(config.atomic_numbers, z_table=z_table)
     one_hot_attrs = to_one_hot(
-        indices=torch.tensor(indices, dtype=torch.long).unsqueeze(-1),
-        num_classes=len(z_table),
+        indices=torch.tensor(state.elements, dtype=torch.long).unsqueeze(-1),
+        num_classes=len(state.bag),
     )
 
     return StateActionData(
         # Canvas
-        num_nodes=len(state.atoms),
+        num_nodes=len(state.elements),
         edge_index=torch.tensor(edge_index, dtype=torch.long),
         shifts=torch.tensor(shifts, dtype=torch.get_default_dtype()),
         node_attrs=one_hot_attrs.to(torch.get_default_dtype()),
-        positions=torch.tensor(config.positions, dtype=torch.get_default_dtype()),
+        positions=torch.tensor(state.positions, dtype=torch.get_default_dtype()),
         # Bag
         bag=torch.tensor([state.bag], dtype=torch.long),
         # Action (optional)
         focus=torch.tensor(action.focus, dtype=torch.long) if action else None,
-        element=torch.tensor(z_table.z_to_index(action.element), dtype=torch.long) if action else None,
+        element=torch.tensor(action.element, dtype=torch.long) if action else None,
         distance=torch.tensor(action.distance, dtype=torch.get_default_dtype()) if action else None,
         orientation=torch.tensor([action.orientation], dtype=torch.get_default_dtype()) if action else None,
     )

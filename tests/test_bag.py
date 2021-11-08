@@ -2,7 +2,7 @@ import ase.data
 import pytest
 
 from molgym.data import AtomicNumberTable
-from molgym.data.tables import discrete_bag_from_atomic_numbers, remove_z_from_bag
+from molgym.data.tables import discrete_bag_from_atomic_numbers, remove_element_from_bag
 
 
 def test_discrete_bag():
@@ -11,13 +11,13 @@ def test_discrete_bag():
     bag = discrete_bag_from_atomic_numbers((ase.data.atomic_numbers[s] for s in symbols), z_table)
 
     assert all(value == expected for value, expected in zip(bag, [2, 2, 3]))
-    bag = remove_z_from_bag(1, bag, z_table=z_table)
+    bag = remove_element_from_bag(0, bag)
     assert all(value == expected for value, expected in zip(bag, [1, 2, 3]))
-    bag = remove_z_from_bag(1, bag, z_table=z_table)
+    bag = remove_element_from_bag(0, bag)
     assert all(value == expected for value, expected in zip(bag, [0, 2, 3]))
 
     with pytest.raises(ValueError):
-        remove_z_from_bag(1, bag, z_table=z_table)
+        remove_element_from_bag(0, bag)
 
 
 def test_mismatch():

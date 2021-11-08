@@ -25,8 +25,9 @@ def get_atomic_number_table_from_zs(zs: Iterable[int]) -> AtomicNumberTable:
     return AtomicNumberTable(sorted(list(z_set)))
 
 
-Bag = Tuple[Union[int, float], ...]
 DiscreteBag = Tuple[int, ...]
+ContinuousBag = Tuple[float, ...]
+Bag = Union[DiscreteBag, ContinuousBag]
 
 
 def discrete_bag_from_atomic_numbers(zs: Iterable[int], z_table: AtomicNumberTable) -> DiscreteBag:
@@ -37,11 +38,14 @@ def discrete_bag_from_atomic_numbers(zs: Iterable[int], z_table: AtomicNumberTab
     return tuple(bag)
 
 
-def remove_z_from_bag(z: int, bag: DiscreteBag, z_table: AtomicNumberTable) -> DiscreteBag:
-    index = z_table.z_to_index(z)
-    if bag[index] < 1:
-        raise ValueError(f"Cannot remove atomic number '{z}' from '{bag}'")
+def remove_element_from_bag(e: int, bag: DiscreteBag) -> DiscreteBag:
+    if bag[e] < 1:
+        raise ValueError(f"Cannot remove element with index '{e}' from '{bag}'")
 
     copy = list(bag)
-    copy[index] -= 1
+    copy[e] -= 1
     return tuple(copy)
+
+
+def bag_is_empty(bag: DiscreteBag) -> bool:
+    return sum(bag) == 0

@@ -6,27 +6,27 @@ import ase.io
 import numpy as np
 
 from . import graph_tools, tables
-from .tables import DiscreteBag, Bag, AtomicNumberTable
+from molgym.tools import TensorDict, to_numpy
 
 
 @dataclass
 class Action:
     focus: int
-    element: int
+    element: int  # index, not Z
     distance: float
     orientation: Tuple[float, float, float]
 
 
 @dataclass
 class State:
-    atoms: ase.Atoms
-    bag: Bag
+    elements: List[int]  # indices, not Zs
+    positions: np.ndarray
+    bag: tables.Bag
 
 
 @dataclass
-class DiscreteBagState:
-    atoms: ase.Atoms
-    bag: DiscreteBag
+class DiscreteBagState(State):
+    bag: tables.DiscreteBag
 
 
 @dataclass
@@ -84,15 +84,15 @@ def get_orientation(
     return vec[0], vec[1], vec[2]
 
 
-def get_actions(atoms: ase.Atoms) -> Sequence[Action]:
+def get_action_sequence(atoms: ase.Atoms, z_table: tables.AtomicNumberTable) -> Sequence[Action]:
     focuses = [get_focus(atoms[:t], atoms[t]) for t in range(len(atoms))]
-    zs = [ase.data.atomic_numbers[atom.symbol] for atom in atoms]
+    elements = [z_table.z_to_index(ase.data.atomic_numbers[atom.symbol]) for atom in atoms]
     distances = [get_distance(canvas=atoms[:t], focus=focuses[t], new_atom=atoms[t]) for t in range(len(atoms))]
     orientations = [get_orientation(canvas=atoms[:t], focus=focuses[t], new_atom=atoms[t]) for t in range(len(atoms))]
 
     return [
-        Action(focus=focus, element=z, distance=distance, orientation=orientation)
-        for focus, z, distance, orientation in zip(focuses, zs, distances, orientations)
+        Action(focus=focus, element=element, distance=distance, orientation=orientation)
+        for focus, element, distance, orientation in zip(focuses, elements, distances, orientations)
     ]
 
 
@@ -108,44 +108,68 @@ def reorder_random_neighbor(atoms: ase.Atoms, cutoff_distance=1.6, seed=1) -> as
     return graph_tools.select_atoms(atoms, sequence)
 
 
-def get_canvases(atoms: ase.Atoms) -> List[ase.Atoms]:
-    return [atoms[:i] for i in range(len(atoms) + 1)]
+def get_canvas(atoms: ase.Atoms, z_table: tables.AtomicNumberTable) -> Tuple[List[int], np.ndarray]:
+    if len(atoms) > 0:
+        return (
+            [z_table.z_to_index(ase.data.atomic_numbers[s]) for s in atoms.symbols],
+            atoms.positions,
+        )
+
+    return [0], np.array([[0.0, 0.0, 0.0]])
 
 
-def get_discrete_bags(atoms: ase.Atoms, z_table: AtomicNumberTable) -> List[DiscreteBag]:
-    return [
-        tables.discrete_bag_from_atomic_numbers(zs=(ase.data.atomic_numbers[s] for s in atoms[i:].symbols),
-                                                z_table=z_table) for i in range(len(atoms) + 1)
-    ]
+def get_initial_state(atoms: ase.Atoms, z_table: tables.AtomicNumberTable) -> DiscreteBagState:
+    elements, positions = get_canvas(ase.Atoms(), z_table)
+    bag = tables.discrete_bag_from_atomic_numbers(zs=(ase.data.atomic_numbers[s] for s in atoms.symbols),
+                                                  z_table=z_table)
+    return DiscreteBagState(elements, positions, bag)
 
 
-def propagate_discrete_bag_state(state: DiscreteBagState, action: Action,
-                                 z_table: AtomicNumberTable) -> DiscreteBagState:
-    if len(state.atoms) == 0:
-        new_position = np.array([0., 0., 0.])
-    else:
-        new_position = state.atoms[action.focus].position + action.distance * np.array(action.orientation)
+def propagate_discrete_bag_state(state: DiscreteBagState, action: Action) -> DiscreteBagState:
+    new_bag = tables.remove_element_from_bag(action.element, state.bag)
 
+    if (len(state.elements) == 0) or (len(state.elements) == 1 and state.elements[0] == 0):
+        return DiscreteBagState(elements=[action.element], positions=np.zeros((1, 3)), bag=new_bag)
+
+    new_position = state.positions[action.focus] + action.distance * np.array(action.orientation)
     return DiscreteBagState(
-        atoms=state.atoms.copy() + ase.Atom(symbol=action.element, position=new_position),
-        bag=tables.remove_z_from_bag(action.element, state.bag, z_table),
+        elements=state.elements + [action.element],
+        positions=np.concatenate([state.positions, np.expand_dims(new_position, 0)]),
+        bag=new_bag,
     )
 
 
-def generate_sparse_reward_trajectory(atoms: ase.Atoms, z_table: AtomicNumberTable, final_reward: float) -> Trajectory:
-    atoms_list = get_canvases(atoms)
-    bags = get_discrete_bags(atoms, z_table)
+def state_to_atoms(state: State, z_table: tables.AtomicNumberTable) -> ase.Atoms:
+    return ase.Atoms(
+        symbols=[ase.data.chemical_symbols[z_table.index_to_z(e)] for e in state.elements],
+        positions=state.positions,
+        info={'bag': {ase.data.chemical_symbols[z_table.index_to_z(i)]: v
+                      for i, v in enumerate(state.bag)}},
+    )
 
-    # Add dummy atom if canvas is empty
-    states = [
-        State(atoms=atoms if len(atoms) != 0 else ase.Atoms(symbols='X', positions=[[0.0, 0.0, 0.0]]), bag=bag)
-        for atoms, bag in zip(atoms_list, bags)
+
+def is_terminal(state: State) -> bool:
+    if not isinstance(state, DiscreteBagState):
+        return False
+
+    return tables.bag_is_empty(state.bag)
+
+
+def generate_sparse_reward_trajectory(
+    atoms: ase.Atoms,
+    z_table: tables.AtomicNumberTable,
+    final_reward: float,
+) -> Trajectory:
+    canvases = [get_canvas(atoms[:i], z_table) for i in range(len(atoms) + 1)]
+    bags = [
+        tables.discrete_bag_from_atomic_numbers(zs=(ase.data.atomic_numbers[s] for s in atoms[i:].symbols),
+                                                z_table=z_table) for i in range(len(atoms) + 1)
     ]
+    states = [State(zs, positions, bag) for (zs, positions), bag in zip(canvases, bags)]
+    actions = get_action_sequence(atoms, z_table)
 
-    actions = get_actions(atoms)
-    length = len(actions)
-
-    assert len(actions) == len(states) - 1
+    num_actions = len(actions)
+    assert num_actions == len(states) - 1
 
     tau = []
     for index, (state, action, next_state) in enumerate(zip(states[:-1], actions, states[1:])):
@@ -153,9 +177,16 @@ def generate_sparse_reward_trajectory(atoms: ase.Atoms, z_table: AtomicNumberTab
             SARS(
                 state=state,
                 action=action,
-                reward=final_reward if index == length - 1 else 0.0,
+                reward=final_reward if index == num_actions - 1 else 0.0,
                 next_state=next_state,
-                done=index == length - 1,
+                done=index == num_actions - 1,
             ))
 
     return tau
+
+
+def build_actions(td: TensorDict) -> List[Action]:
+    return [
+        Action(focus=f, element=e, distance=d, orientation=o) for (f, e, d, o) in zip(
+            to_numpy(td['focus']), to_numpy(td['element']), to_numpy(td['distance']), to_numpy(td['orientation']))
+    ]

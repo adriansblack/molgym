@@ -1,8 +1,8 @@
 import argparse
 from typing import Sequence, Tuple
 
-import ase.io
 import ase.data
+import ase.io
 import numpy as np
 import plotly.graph_objects as go
 import torch
@@ -182,7 +182,7 @@ def main():
     sars_list = data.generate_sparse_reward_trajectory(atoms, z_table, final_reward=0.0)
 
     geometric_data = [
-        data.build_state_action_data(state=item.state, action=item.action, z_table=z_table, cutoff=args.d_max)
+        data.build_state_action_data(state=item.state, cutoff=args.d_max, action=item.action)
         for item in sars_list
     ]
 

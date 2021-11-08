@@ -10,7 +10,8 @@ import pytest
 
 from molgym.data import AtomicNumberTable
 from molgym.data.graph_tools import generate_topology
-from molgym.data.trajectory import (Action, get_actions, reorder_breadth_first, generate_sparse_reward_trajectory,
+from molgym.data.trajectory import (Action, get_action_sequence, reorder_breadth_first,
+                                    generate_sparse_reward_trajectory,
                                     DiscreteBagState, propagate_discrete_bag_state)
 
 
@@ -67,7 +68,7 @@ def test_disjoint_graph(ethanol):
         generate_topology(ethanol, cutoff_distance=1.0)
 
 
-def rollout_actions(actions: Sequence[Action]) -> ase.Atoms:
+def rollout_actions(actions: Sequence[Action], z_table: AtomicNumberTable) -> ase.Atoms:
     atoms = ase.Atoms()
 
     for action in actions:
@@ -76,17 +77,19 @@ def rollout_actions(actions: Sequence[Action]) -> ase.Atoms:
         else:
             position = atoms[action.focus].position + action.distance * np.array(action.orientation)
 
-        atoms.append(ase.Atom(symbol=action.element, position=position))
+        atoms.append(ase.Atom(symbol=z_table.index_to_z(action.element), position=position))
 
     return atoms
 
 
 def test_rollout(ethanol):
-    new_atoms = reorder_breadth_first(ethanol, cutoff_distance=1.6, seed=1)
-    actions = get_actions(new_atoms)
-    rolled_out = rollout_actions(actions)
-    aligned_atoms = rotation_translation_align(rolled_out, target=new_atoms)
-    rmsd = compute_rmsd(aligned_atoms, new_atoms)
+    atoms = reorder_breadth_first(ethanol, cutoff_distance=1.6, seed=1)
+    z_table = AtomicNumberTable([1, 6, 8])
+    actions = get_action_sequence(atoms, z_table=z_table)
+    rolled_out = rollout_actions(actions, z_table=z_table)
+    assert atoms.symbols.get_chemical_formula() == rolled_out.symbols.get_chemical_formula()
+    aligned_atoms = rotation_translation_align(rolled_out, target=atoms)
+    rmsd = compute_rmsd(aligned_atoms, atoms)
     assert rmsd < 1e-10
 
 
@@ -101,23 +104,22 @@ def test_trajectory_generation(ethanol):
     assert np.isclose(trajectory[-1].reward, 1.5)
 
     sars_first = trajectory[0]
-    assert len(sars_first.state.atoms) == 1  # if canvas is empty, it contains a fake atom
+    assert len(sars_first.state.elements) == 1  # if canvas is empty, it contains a fake atom
     assert sum(sars_first.state.bag) == len(ethanol)  # bag is full
 
     sars_last = trajectory[-1]
-    assert len(sars_last.state.atoms) == len(ethanol) - 1  # canvas close to full
+    assert len(sars_last.state.elements) == len(ethanol) - 1  # canvas close to full
     assert sum(sars_last.state.bag) == 1  # one atom remaining
-    assert len(sars_last.next_state.atoms) == len(ethanol)  # canvas is full
+    assert len(sars_last.next_state.elements) == len(ethanol)  # canvas is full
     assert sum(sars_last.next_state.bag) == 0  # no atoms remaining
 
 
 def test_propagate():
-    z_table = AtomicNumberTable([1])
-    state = DiscreteBagState(atoms=ase.Atoms(), bag=(1, 1, 1))
+    state = DiscreteBagState(elements=[0], positions=np.zeros((1, 3)), bag=(0, 1, 1))
     action = Action(focus=0, element=1, distance=1.5, orientation=(1.5, 1.0, 1.2))
-    new_state = propagate_discrete_bag_state(state, action, z_table)
-    assert len(new_state.atoms) == 1
+    new_state = propagate_discrete_bag_state(state, action)
+    assert len(new_state.elements) == 1
 
-    action = Action(focus=0, element=2, distance=1.5, orientation=(1.5, 1.0, 1.2))
+    action = Action(focus=0, element=0, distance=1.5, orientation=(1.5, 1.0, 1.2))
     with pytest.raises(ValueError):
-        propagate_discrete_bag_state(state, action, z_table)
+        propagate_discrete_bag_state(state, action)
