@@ -66,7 +66,7 @@ class ProgressLogger:
     def log(self, d: Dict[str, Any]) -> None:
         logging.debug(f'Saving info: {self.path}')
         os.makedirs(name=self.directory, exist_ok=True)
-        with open(self.path, mode='a') as f:
+        with open(self.path, mode='a', encoding='ascii') as f:
             f.write(json.dumps(d, cls=UniversalEncoder))
             f.write('\n')
 
