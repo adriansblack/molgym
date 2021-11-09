@@ -43,6 +43,7 @@ def sample_trajectories(
     initial_state: data.DiscreteBagState,
     cutoff: float,
     count: int,
+    device: torch.device,
 ) -> List[data.DiscreteBagState]:
 
     terminal_states = []
@@ -59,6 +60,7 @@ def sample_trajectories(
             )
 
             batch = next(iter(loader))
+            batch = batch.to(device)
             response, aux = policy(batch)
             actions = data.build_actions(response)
 
@@ -177,11 +179,17 @@ def main() -> None:
         device=device,
     )
 
+    epoch = checkpoint_handler.load_latest(state=tools.CheckpointState(policy, optimizer, lr_scheduler), device=device)
+    logging.info(f'Loaded model from epoch {epoch}')
+
     initial_state = data.get_initial_state(atoms=atoms_list[0], z_table=z_table)
-    terminals = sample_trajectories(policy,
-                                    initial_state=initial_state,
-                                    cutoff=args.d_max,
-                                    count=args.num_sampled_trajectories)
+    terminals = sample_trajectories(
+        policy,
+        initial_state=initial_state,
+        cutoff=args.d_max,
+        count=args.num_sampled_trajectories,
+        device=device,
+    )
     terminal_atoms = [data.state_to_atoms(terminal_state, z_table) for terminal_state in terminals]
     ase.io.write(os.path.join(args.log_dir, tag + '_terminals.xyz'), terminal_atoms, format='extxyz')
 
