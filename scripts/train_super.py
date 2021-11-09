@@ -179,9 +179,11 @@ def main() -> None:
         device=device,
     )
 
+    # Load policy
     epoch = checkpoint_handler.load_latest(state=tools.CheckpointState(policy, optimizer, lr_scheduler), device=device)
     logging.info(f'Loaded model from epoch {epoch}')
 
+    # Test policy
     initial_state = data.get_initial_state(atoms=atoms_list[0], z_table=z_table)
     terminals = sample_trajectories(
         policy,
@@ -193,6 +195,7 @@ def main() -> None:
     terminal_atoms = [data.state_to_atoms(terminal_state, z_table) for terminal_state in terminals]
     ase.io.write(os.path.join(args.log_dir, tag + '_terminals.xyz'), terminal_atoms, format='extxyz')
 
+    # Save policy as model
     policy_path = os.path.join(args.checkpoints_dir, tag + '.model')
     logging.info(f'Saving policy to {policy_path}')
     policy_cpu = policy.to(torch.device('cpu'))
