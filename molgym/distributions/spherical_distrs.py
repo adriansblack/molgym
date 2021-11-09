@@ -119,7 +119,7 @@ class SO3Distribution(SphericalDistribution):
         num_batches = self.batch_shape[0]
 
         max_log_prob = self.get_max_log_prob()
-        max_log_prob_proposal = torch.log(self.spherical_uniform.get_max_prob())
+        max_log_prob_proposal = torch.log(self.spherical_uniform.get_max_prob()).to(self.device)
 
         log_m_value = (max_log_prob - max_log_prob_proposal).unsqueeze(0)  # [S=1, B]
 
@@ -133,7 +133,7 @@ class SO3Distribution(SphericalDistribution):
         candidates_t = torch.empty(size=(0, num_batches) + self.event_shape, device=self.device)
 
         while torch.any(accepted_t.sum(dim=0) < num_samples):
-            candidates = self.spherical_uniform.sample(torch.Size((count, )))  # [count, E]
+            candidates = self.spherical_uniform.sample(torch.Size((count, ))).to(self.device)  # [count, E]
             log_threshold = self.log_prob(candidates) - log_m_value - self.spherical_uniform.log_prob(candidates)
             u = self.uniform_dist.sample(torch.Size((count, ))).unsqueeze(1).to(self.device)  # [count, 1]
             accepted = u < torch.exp(log_threshold)  # [count, B]
