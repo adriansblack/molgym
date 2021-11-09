@@ -26,6 +26,7 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument('--num_radial_basis', help='number of radial basis functions', type=int, default=8)
     parser.add_argument('--num_cutoff_basis', help='number of basis functions for smooth cutoff', type=int, default=6)
     parser.add_argument('--max_ell', help=r'highest \ell of spherical harmonics', type=int, default=3)
+    parser.add_argument('--gamma', help='gamma parameter of spherical distribution', required=False, default=30)
     parser.add_argument('--num_interactions', help='number of interactions', type=int, default=3)
     parser.add_argument('--hidden_irreps',
                         help='irreps for hidden node states',

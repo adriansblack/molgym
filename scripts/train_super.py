@@ -140,7 +140,7 @@ def main() -> None:
         network_width=args.network_width,
         num_gaussians=args.num_gaussians,
         min_max_distance=(args.d_min, args.d_max),
-        gamma=10.0,
+        gamma=args.gamma,
     )
     policy.to(device)
 

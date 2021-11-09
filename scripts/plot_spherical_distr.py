@@ -126,7 +126,7 @@ def main():
     num_datapoints = 1
     num_samples = 25
     lmax = 3
-    gamma = 25
+    gamma = 30
 
     # Note: sample, batch, event (S, B, E)
     data1 = torch.cat([
