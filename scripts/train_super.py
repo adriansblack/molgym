@@ -1,7 +1,7 @@
 import argparse
 import logging
 import os
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import ase.io
 import torch
@@ -44,12 +44,14 @@ def sample_trajectories(
     cutoff: float,
     count: int,
     device: torch.device,
-) -> List[data.DiscreteBagState]:
+) -> Tuple[List[data.DiscreteBagState], List[List[data.Action]]]:
 
     terminal_states = []
+    action_sequences = []
 
     for i in range(count):
         state = initial_state
+        action_sequence = []
 
         while True:
             loader = torch_geometric.loader.DataLoader(
@@ -66,12 +68,14 @@ def sample_trajectories(
 
             assert len(actions) == 1
             state = data.propagate_discrete_bag_state(state, actions[0])
+            action_sequence.append(actions[0])
 
             if data.bag_is_empty(state.bag):
                 terminal_states.append(state)
+                action_sequences.append(action_sequence)
                 break
 
-    return terminal_states
+    return terminal_states, action_sequences
 
 
 def main() -> None:
@@ -185,15 +189,17 @@ def main() -> None:
 
     # Test policy
     initial_state = data.get_initial_state(atoms=atoms_list[0], z_table=z_table)
-    terminals = sample_trajectories(
+    terminals, action_sequences = sample_trajectories(
         policy,
         initial_state=initial_state,
         cutoff=args.d_max,
         count=args.num_sampled_trajectories,
         device=device,
     )
-    terminal_atoms = [data.state_to_atoms(terminal_state, z_table) for terminal_state in terminals]
-    ase.io.write(os.path.join(args.log_dir, tag + '_terminals.xyz'), terminal_atoms, format='extxyz')
+    terminal_atoms_list = [data.state_to_atoms(terminal_state, z_table) for terminal_state in terminals]
+    for terminal_atoms, action_sequence in zip(terminal_atoms_list, action_sequences):
+        terminal_atoms.info['focuses'] = list(int(action.focus) for action in action_sequence)
+    ase.io.write(os.path.join(args.log_dir, tag + '_terminals.xyz'), terminal_atoms_list, format='extxyz')
 
     # Save policy as model
     policy_path = os.path.join(args.checkpoints_dir, tag + '.model')
