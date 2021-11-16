@@ -74,7 +74,7 @@ def take_step(
     start_time = time.time()
     batch = batch.to(device)
     optimizer.zero_grad()
-    output, aux = model(batch)
+    output, aux = model(batch, training=True)
     loss = loss_fn(pred=output, ref=batch)
     loss.backward()
     optimizer.step()
@@ -98,7 +98,7 @@ def evaluate(
     start_time = time.time()
     for batch in data_loader:
         batch = batch.to(device)
-        output, aux = model(batch)
+        output, aux = model(batch, training=False)
         batch = batch.cpu()
         output = tensor_dict_to_device(output, device=torch.device('cpu'))
 

@@ -65,6 +65,8 @@ def test_standard():
     log_probs = distr.log_prob(samples)
     assert samples.shape == (11, 4)
 
+    assert torch.allclose(distr.argmax(), torch.tensor([1, 1, 0, 0], dtype=torch.long))
+
     probs = torch.exp(log_probs)
     assert all(np.isclose(prob.item(), 1.0) for prob in probs[:, 2])
     assert all(np.isclose(prob.item(), 0.5) for prob in probs[:, 3])

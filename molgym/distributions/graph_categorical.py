@@ -31,7 +31,11 @@ class GraphCategoricalDistribution:
 
     # Returns indices for the individual (small) graphs
     def sample(self, sample_shape=torch.Size()) -> torch.Tensor:  # [S, B=num_graphs]
-        return self.distr.sample(sample_shape)  # [S, B=num_graphs]
+        return self.distr.sample(sample_shape)
+
+    # Returns indices for the individual (small) graphs
+    def argmax(self) -> torch.Tensor:  # [B=num_graphs, ]
+        return torch.argmax(self.distr.probs, dim=-1)
 
     # Expects indices for the individual (small) graphs
     def log_prob(self, value) -> torch.Tensor:

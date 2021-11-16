@@ -63,7 +63,7 @@ def sample_trajectories(
 
             batch = next(iter(loader))
             batch = batch.to(device)
-            response, aux = policy(batch)
+            response, aux = policy(batch, training=False)
             actions = data.build_actions(response)
 
             assert len(actions) == 1

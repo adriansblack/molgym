@@ -95,7 +95,7 @@ class Policy(torch.nn.Module):
                                        internal_weights=False)
         self.mix_tp_weights = o3.Linear(o3.Irreps(f'{num_bessel}x0e'), o3.Irreps(f'{self.mix_tp.weight_numel}x0e'))
 
-    def forward(self, data: StateActionBatch) -> Tuple[TensorDict, Dict[str, Any]]:
+    def forward(self, data: StateActionBatch, training=False) -> Tuple[TensorDict, Dict[str, Any]]:
         s_inter = self.embedding(data)
         s_cov = self.bag_tp(s_inter, data.bag[data.batch])
         s_inv = self.norm(s_cov)
@@ -107,8 +107,10 @@ class Policy(torch.nn.Module):
         # Focus
         if hasattr(data, 'focus') and data.focus is not None:
             focus = data.focus
-        else:
+        elif training:
             focus = focus_distr.sample()
+        else:
+            focus = focus_distr.argmax()
 
         # Element
         all_element_logits = self.phi_element(s_inv)  # [n_nodes, n_z]
@@ -118,8 +120,10 @@ class Policy(torch.nn.Module):
 
         if hasattr(data, 'element') and data.element is not None:
             element = data.element
-        else:
+        elif training:
             element = element_distr.sample()
+        else:
+            element = torch.argmax(element_distr.probs, dim=-1)
 
         element_oh = to_one_hot(element.unsqueeze(-1), num_classes=self.num_elements)
 
@@ -134,8 +138,10 @@ class Policy(torch.nn.Module):
 
         if hasattr(data, 'distance') and data.distance is not None:
             distance = data.distance
-        else:
+        elif training:
             distance = d_distr.sample()
+        else:
+            distance = d_distr.argmax()
 
         # Orientation
         focused_cov = s_cov[focus + data.ptr[:-1]]
@@ -145,8 +151,10 @@ class Policy(torch.nn.Module):
 
         if hasattr(data, 'orientation') and data.orientation is not None:
             orientation = data.orientation
-        else:
+        elif training:
             orientation = spherical_distr.sample()
+        else:
+            orientation = spherical_distr.argmax()
 
         # Log probs
         log_prob_list = [
