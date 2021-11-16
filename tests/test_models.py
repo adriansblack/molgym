@@ -35,7 +35,7 @@ def test_bo_model():
         hidden_irreps=o3.Irreps('10x0e + 10x0o + 8x1e + 8x1o + 4x2e + 4x2o'),
     )
 
-    assert tools.count_parameters(model) == 3164
+    assert tools.count_parameters(model) == 3696
 
     atomic_data = data.build_energy_forces_data(config, z_table=table, cutoff=3.0)
     data_loader = torch_geometric.loader.DataLoader([atomic_data, atomic_data], batch_size=2)
