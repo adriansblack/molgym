@@ -153,8 +153,8 @@ def plot_orientation_distribution(fig, row, col, distr: distributions.SO3Distrib
         z=radius * grid[..., 2],
         surfacecolor=values,
         colorscale='Viridis',
-        cmax=values.max().item(),
-        cmin=values.min().item(),
+        cmax=max(values.max().item(), 0.0),
+        cmin=max(values.min().item(), 0.0),
         colorbar=dict(
             title='p(x)',
             titleside='right',
@@ -225,8 +225,9 @@ def main():
     z_table = data.AtomicNumberTable([int(z) for z in args.zs.split(',')])
     symbols = [ase.data.chemical_symbols[z] for z in z_table.zs]
 
-    # Can result in wrong actions
-    sars_list = data.generate_sparse_reward_trajectory(atoms, z_table, final_reward=0.0)
+    focuses = atoms.info.get('focuses', None)
+    assert len(focuses) == len(atoms) if focuses is not None else True
+    sars_list = data.generate_sparse_reward_trajectory(atoms, z_table, final_reward=0.0, focuses=focuses)
 
     geometric_data = [
         data.build_state_action_data(state=item.state, cutoff=args.d_max, action=item.action) for item in sars_list

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Sequence, Tuple, List
+from typing import Sequence, Tuple, List, Optional
 
 import ase.data
 import ase.io
@@ -84,8 +84,14 @@ def get_orientation(
     return vec[0], vec[1], vec[2]
 
 
-def get_action_sequence(atoms: ase.Atoms, z_table: tables.AtomicNumberTable) -> Sequence[Action]:
-    focuses = [get_focus(atoms[:t], atoms[t]) for t in range(len(atoms))]
+def get_action_sequence(
+    atoms: ase.Atoms,
+    z_table: tables.AtomicNumberTable,
+    focuses: Optional[List[int]] = None,
+) -> Sequence[Action]:
+    if focuses is None:
+        focuses = [get_focus(atoms[:t], atoms[t]) for t in range(len(atoms))]
+
     elements = [z_table.z_to_index(ase.data.atomic_numbers[atom.symbol]) for atom in atoms]
     distances = [get_distance(canvas=atoms[:t], focus=focuses[t], new_atom=atoms[t]) for t in range(len(atoms))]
     orientations = [get_orientation(canvas=atoms[:t], focus=focuses[t], new_atom=atoms[t]) for t in range(len(atoms))]
@@ -159,6 +165,7 @@ def generate_sparse_reward_trajectory(
     atoms: ase.Atoms,
     z_table: tables.AtomicNumberTable,
     final_reward: float,
+    focuses: Optional[List[int]] = None,
 ) -> Trajectory:
     canvases = [get_canvas(atoms[:i], z_table) for i in range(len(atoms) + 1)]
     bags = [
@@ -166,7 +173,7 @@ def generate_sparse_reward_trajectory(
                                                 z_table=z_table) for i in range(len(atoms) + 1)
     ]
     states = [State(zs, positions, bag) for (zs, positions), bag in zip(canvases, bags)]
-    actions = get_action_sequence(atoms, z_table)
+    actions = get_action_sequence(atoms, z_table, focuses=focuses)
 
     num_actions = len(actions)
     assert num_actions == len(states) - 1
