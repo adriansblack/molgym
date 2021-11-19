@@ -44,6 +44,7 @@ def sample_trajectories(
     cutoff: float,
     count: int,
     device: torch.device,
+    training: bool,
 ) -> Tuple[List[data.DiscreteBagState], List[List[data.Action]]]:
 
     terminal_states = []
@@ -63,7 +64,7 @@ def sample_trajectories(
 
             batch = next(iter(loader))
             batch = batch.to(device)
-            response, aux = policy(batch, training=False)
+            response, aux = policy(batch, training=training)
             actions = data.build_actions(response)
 
             assert len(actions) == 1
@@ -76,6 +77,16 @@ def sample_trajectories(
                 break
 
     return terminal_states, action_sequences
+
+
+def generate_atoms(
+    state: data.DiscreteBagState,
+    actions: List[data.Action],
+    z_table: data.AtomicNumberTable,
+) -> ase.Atoms:
+    atoms = data.state_to_atoms(state, z_table)
+    atoms.info['focuses'] = list(int(action.focus) for action in actions)
+    return atoms
 
 
 def main() -> None:
@@ -193,13 +204,29 @@ def main() -> None:
         policy,
         initial_state=initial_state,
         cutoff=args.d_max,
+        count=1,
+        device=device,
+        training=False,
+    )
+    terminal_structs = [
+        generate_atoms(terminal_state, actions, z_table)
+        for terminal_state, actions in zip(terminals, action_sequences)
+    ]
+    ase.io.write(os.path.join(args.log_dir, tag + '_det.xyz'), terminal_structs, format='extxyz')
+
+    terminals, action_sequences = sample_trajectories(
+        policy,
+        initial_state=initial_state,
+        cutoff=args.d_max,
         count=args.num_sampled_trajectories,
         device=device,
+        training=True,
     )
-    terminal_atoms_list = [data.state_to_atoms(terminal_state, z_table) for terminal_state in terminals]
-    for terminal_atoms, action_sequence in zip(terminal_atoms_list, action_sequences):
-        terminal_atoms.info['focuses'] = list(int(action.focus) for action in action_sequence)
-    ase.io.write(os.path.join(args.log_dir, tag + '_terminals.xyz'), terminal_atoms_list, format='extxyz')
+    terminal_structs = [
+        generate_atoms(terminal_state, actions, z_table)
+        for terminal_state, actions in zip(terminals, action_sequences)
+    ]
+    ase.io.write(os.path.join(args.log_dir, tag + '_sampled.xyz'), terminal_structs, format='extxyz')
 
     # Save policy as model
     policy_path = os.path.join(args.checkpoints_dir, tag + '.model')
