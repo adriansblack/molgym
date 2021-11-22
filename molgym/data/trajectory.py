@@ -154,13 +154,6 @@ def state_to_atoms(state: State, z_table: tables.AtomicNumberTable) -> ase.Atoms
     )
 
 
-def is_terminal(state: State) -> bool:
-    if not isinstance(state, DiscreteBagState):
-        return False
-
-    return tables.bag_is_empty(state.bag)
-
-
 def generate_sparse_reward_trajectory(
     atoms: ase.Atoms,
     z_table: tables.AtomicNumberTable,

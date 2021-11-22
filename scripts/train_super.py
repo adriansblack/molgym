@@ -50,7 +50,7 @@ def sample_trajectories(
     terminal_states = []
     action_sequences = []
 
-    for i in range(count):
+    for _ in range(count):
         state = initial_state
         action_sequence = []
 
@@ -64,7 +64,7 @@ def sample_trajectories(
 
             batch = next(iter(loader))
             batch = batch.to(device)
-            response, aux = policy(batch, training=training)
+            response, _ = policy(batch, training=training)
             actions = data.build_actions(response)
 
             assert len(actions) == 1
