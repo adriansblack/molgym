@@ -5,8 +5,8 @@ import ase.data
 import ase.io
 import numpy as np
 
-from . import graph_tools, tables
 from molgym.tools import TensorDict, to_numpy
+from . import graph_tools, tables
 
 
 @dataclass

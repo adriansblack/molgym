@@ -3,18 +3,17 @@ from typing import Tuple
 
 import ase.data
 import numpy as np
-from ase import Atoms, Atom
 
-from molgym.data import Action, State, AtomicNumberTable, propagate_discrete_bag_state, DiscreteBagState, bag_is_empty, \
-    state_to_atoms
-from .reward import InteractionReward
+from molgym import data
+from molgym.data import Action, State, AtomicNumberTable, DiscreteBagState
+from .reward import SparseInteractionReward
 
 
 def is_terminal(state: State) -> bool:
     if not isinstance(state, DiscreteBagState):
         return False
 
-    return bag_is_empty(state.bag)
+    return data.bag_is_empty(state.bag)
 
 
 def any_too_close(
@@ -24,13 +23,13 @@ def any_too_close(
 ) -> bool:
     positions = np.expand_dims(positions, axis=1)
     other_positions = np.expand_dims(other_positions, axis=0)
-    return any(np.linalg.norm(positions - other_positions) < threshold)
+    return bool(np.any(np.linalg.norm(positions - other_positions) < threshold))
 
 
 class DiscreteMolecularEnvironment:
     def __init__(
         self,
-        reward: InteractionReward,
+        reward_fn: SparseInteractionReward,
         initial_state: DiscreteBagState,
         z_table: AtomicNumberTable,
         min_atomic_distance=0.6,  # Angstrom
@@ -38,7 +37,7 @@ class DiscreteMolecularEnvironment:
         min_reward=-0.6,  # Hartree
         seed=0,
     ):
-        self.reward = reward
+        self.reward_fn = reward_fn
         self.initial_state = initial_state
         self.z_table = z_table
 
@@ -46,20 +45,23 @@ class DiscreteMolecularEnvironment:
         self.max_solo_distance = max_solo_distance
         self.min_reward = min_reward
 
-        self.candidate_indices = [z_table.z_to_index(ase.data.atomic_numbers[s]) for s in ['H', 'F', 'Cl', 'Br']]
+        self.candidate_elements = [
+            self.z_table.z_to_index(ase.data.atomic_numbers[s]) for s in ['H', 'F', 'Cl', 'Br']
+            if ase.data.atomic_numbers[s] in self.z_table.zs
+        ]
 
-        self.seed = seed
-        self.random_state = np.random.RandomState(self.seed)
+        self.random_seed = seed
+        self.random_state = np.random.RandomState(self.random_seed)
         self.current_state = self.initial_state
         self.terminal = False
 
     def seed(self, seed=None) -> int:
-        self.seed = seed or np.random.randint(int(1e5))
-        self.random_state = np.random.RandomState(self.seed)
-        return self.seed
+        self.random_seed = seed or np.random.randint(int(1e5))
+        self.random_state = np.random.RandomState(self.random_seed)
+        return self.random_seed
 
     def reset(self) -> None:
-        self.random_state = np.random.RandomState(self.seed)
+        self.random_state = np.random.RandomState(self.random_seed)
         self.current_state = self.initial_state
         self.terminal = False
 
@@ -67,22 +69,23 @@ class DiscreteMolecularEnvironment:
         if self.terminal:
             raise RuntimeError('Stepping with terminal state')
 
-        self.current_state = propagate_discrete_bag_state(self.current_state, action)
+        self.current_state = data.propagate_discrete_bag_state(self.current_state, action)
 
+        # Is state valid?
         if not self._is_valid_state(self.current_state):
             self.terminal = True
             return self.current_state, self.min_reward, True, {}
 
-        # Check if state is terminal
+        # Is state terminal?
         if is_terminal(self.current_state):
             done = True
             self.terminal = True
             reward, info = self._calculate_reward(self.current_state)
-
         else:
             done = False
             reward, info = 0.0, {}
 
+        # Is reward too low?
         if reward < self.min_reward:
             done = True
             self.terminal = True
@@ -91,27 +94,39 @@ class DiscreteMolecularEnvironment:
         return self.current_state, reward, done, info
 
     def _is_valid_state(self, state: State) -> bool:
+        if len(state.elements) <= 1:
+            return True
+
         if any_too_close(state.positions[:-1], state.positions[-1:], threshold=self.min_atomic_distance):
+            logging.debug('Two atoms are too close')
             return False
 
-        return self._last_covered(state)
+        if not self._last_covered(state):
+            logging.debug('There is a single atom floating around')
+            return False
+
+        return True
 
     def _calculate_reward(self, state: State) -> Tuple[float, dict]:
-        atoms = state_to_atoms(state, self.z_table)
-        return self.reward.calculate(atoms)
+        atoms = data.state_to_atoms(state, self.z_table)
+        return self.reward_fn.calculate(atoms)
 
     def _last_covered(self, state: State) -> bool:
         # Ensure that certain atoms are not too far away from the nearest heavy atom to avoid H2, F2,... formation
-        if len(existing_atoms) == 0 or new_atom.symbol not in candidates:
+
+        if len(state.elements) <= 1:
             return True
 
-        for existing_atom in existing_atoms:
-            if existing_atom.symbol in candidates:
+        last_element, last_position = state.elements[-1], state.positions[-1]
+        if last_element not in self.candidate_elements:
+            return True
+
+        for other_element, other_position in zip(state.elements[:-1], state.positions[:-1]):
+            if other_element in self.candidate_elements:
                 continue
 
-            distance = np.linalg.norm(existing_atom.position - new_atom.position)
+            distance = np.linalg.norm(other_position - last_position)
             if distance < self.max_solo_distance:
                 return True
 
-        logging.debug('There is a single atom floating around')
         return False

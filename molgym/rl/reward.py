@@ -18,7 +18,7 @@ class MolecularReward(abc.ABC):
         return sum(ase.data.atomic_numbers[atom.symbol] for atom in atoms) % 2 + 1
 
 
-class InteractionReward(MolecularReward):
+class SparseInteractionReward(MolecularReward):
     def __init__(self) -> None:
         # Due to some mysterious bug in Sparrow, calculations get slower and slower over time.
         # For this reason, we generate a new Sparrow object every time.
