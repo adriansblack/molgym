@@ -11,7 +11,7 @@ def rollout(
     policy,
     envs: EnvironmentCollection,
     num_steps: Optional[int],
-    num_episodes: Optional[int],
+    num_episodes: Optional[int],  # can be more, in practice
     d_max: float,
     batch_size: int,
     device: torch.device,
@@ -54,10 +54,9 @@ def rollout(
 
         for i, sars_list in enumerate(sars_lists):
             if sars_list[-1].done:
-                if (num_episodes is None) or (episode_counter < num_episodes):
-                    buffer += sars_list
-                    episode_counter += 1
+                buffer += sars_list
                 sars_list.clear()
+                episode_counter += 1
                 next_states[i] = envs.reset_env(i)
 
         states = next_states
