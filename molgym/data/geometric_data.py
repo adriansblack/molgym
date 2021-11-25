@@ -60,11 +60,15 @@ def build_energy_forces_data(
     )
 
 
-class StateActionData(AtomicData):
-    # Bag
+class StateData(AtomicData):
     bag: torch.Tensor
 
-    # Action
+
+class StateBatch(torch_geometric.data.Batch, StateData):
+    pass
+
+
+class StateActionData(StateData):
     focus: torch.Tensor
     element: torch.Tensor
     distance: torch.Tensor
