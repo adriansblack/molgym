@@ -9,10 +9,10 @@ from molgym.data import StateActionBatch, FOCUS_KEY, ELEMENT_KEY, DISTANCE_KEY, 
 from molgym.distributions import (GaussianMixtureModel, GraphCategoricalDistribution, SO3Distribution,
                                   compute_ef_cond_entropy)
 from molgym.tools import masked_softmax, to_one_hot, TensorDict
-from .blocks import MLP
-from .irreps_tools import get_merge_instructions
-from .models import SimpleModel
-from .radial import BesselBasis
+from molgym.modules.blocks import MLP
+from molgym.modules.irreps_tools import get_merge_instructions
+from molgym.modules.models import SimpleModel
+from molgym.modules.radial import BesselBasis
 
 
 class Policy(torch.nn.Module):

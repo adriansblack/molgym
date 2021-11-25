@@ -5,7 +5,7 @@ from typing import Dict
 import ase
 from e3nn import o3
 
-from molgym import tools, data, modules, rl
+from molgym import tools, data, rl
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
@@ -46,7 +46,7 @@ def main() -> None:
     z_table = data.AtomicNumberTable(sorted(z_energies.keys()))
     logging.info(z_table)
 
-    policy = modules.Policy(
+    policy = rl.Policy(
         r_max=args.r_max,
         num_bessel=args.num_radial_basis,
         num_polynomial_cutoff=args.num_cutoff_basis,

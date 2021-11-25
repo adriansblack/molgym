@@ -8,7 +8,7 @@ import torch
 import torch_geometric
 from e3nn import o3
 
-from molgym import tools, data, modules
+from molgym import tools, data, rl
 from molgym.data import graph_tools, SARS
 
 
@@ -39,7 +39,7 @@ def get_interaction_energy(config: data.Configuration, z_energies: Dict[int, flo
 
 
 def sample_trajectories(
-    policy: modules.Policy,
+    policy: rl.Policy,
     initial_state: data.DiscreteBagState,
     cutoff: float,
     count: int,
@@ -144,7 +144,7 @@ def main() -> None:
         ) for dataset in (train_data, valid_data)
     ]
 
-    policy = modules.Policy(
+    policy = rl.Policy(
         r_max=args.r_max,
         num_bessel=args.num_radial_basis,
         num_polynomial_cutoff=args.num_cutoff_basis,
