@@ -5,7 +5,7 @@ import torch.nn
 import torch_scatter
 from e3nn import o3
 
-from molgym.data import StateActionBatch
+from molgym.data import StateActionBatch, FOCUS_KEY, ELEMENT_KEY, DISTANCE_KEY, ORIENTATION_KEY
 from molgym.distributions import (GaussianMixtureModel, GraphCategoricalDistribution, SO3Distribution,
                                   compute_ef_cond_entropy)
 from molgym.tools import masked_softmax, to_one_hot, TensorDict
@@ -176,10 +176,10 @@ class Policy(torch.nn.Module):
         entropy = torch.stack(entropy_list, dim=-1).sum(dim=-1)  # [n_graphs, ]
 
         response = {
-            'focus': focus,
-            'element': element,
-            'distance': distance,
-            'orientation': orientation,
+            FOCUS_KEY: focus,
+            ELEMENT_KEY: element,
+            DISTANCE_KEY: distance,
+            ORIENTATION_KEY: orientation,
             'logp': log_prob,
             'entropy': entropy,
         }

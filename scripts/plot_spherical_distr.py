@@ -10,8 +10,8 @@ from molgym.tools import set_seeds
 def get_ring_samples(beta: float, num: int) -> torch.Tensor:
     alphas = torch.linspace(0, 2 * np.pi, steps=num + 1)[:-1]
     betas = torch.tensor([beta])
-    alpha, beta = torch.meshgrid(alphas, betas)
-    return o3.angles_to_xyz(alpha, beta).reshape(-1, 3)
+    alphas_t, betas_t = torch.meshgrid(alphas, betas)
+    return o3.angles_to_xyz(alphas_t, betas_t).reshape(-1, 3)
 
 
 def s2_grid(num=80) -> torch.Tensor:
@@ -36,9 +36,9 @@ def optimize_parameters(coeffs: torch.Tensor, lmax: int, gamma: float, data: tor
         loss.backward()
         optimizer.step()
 
-        loss = loss.detach().numpy()
-        if np.abs(loss - prev_loss) > 1e-6:
-            prev_loss = loss
+        loss_np = loss.detach().numpy()
+        if np.abs(loss_np - prev_loss) > 1e-6:
+            prev_loss = loss_np
         else:
             print(f'Converged after {i+1} steps')
             break

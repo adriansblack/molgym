@@ -11,8 +11,7 @@ import pytest
 from molgym.data import AtomicNumberTable
 from molgym.data.graph_tools import generate_topology
 from molgym.data.trajectory import (Action, get_action_sequence, reorder_breadth_first,
-                                    generate_sparse_reward_trajectory,
-                                    DiscreteBagState, propagate_discrete_bag_state)
+                                    generate_sparse_reward_trajectory, DiscreteBagState, propagate_discrete_bag_state)
 
 
 def rotation_translation_align(atoms: ase.Atoms, target: ase.Atoms) -> ase.Atoms:

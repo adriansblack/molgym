@@ -8,6 +8,11 @@ import numpy as np
 from molgym.tools import TensorDict, to_numpy
 from . import graph_tools, tables
 
+FOCUS_KEY = 'focus'
+ELEMENT_KEY = 'element'
+DISTANCE_KEY = 'distance'
+ORIENTATION_KEY = 'orientation'
+
 
 @dataclass
 class Action:
@@ -187,6 +192,7 @@ def generate_sparse_reward_trajectory(
 
 def build_actions(td: TensorDict) -> List[Action]:
     return [
-        Action(focus=f, element=e, distance=d, orientation=o) for (f, e, d, o) in zip(
-            to_numpy(td['focus']), to_numpy(td['element']), to_numpy(td['distance']), to_numpy(td['orientation']))
+        Action(focus=f, element=e, distance=d, orientation=o)
+        for (f, e, d, o) in zip(to_numpy(td[FOCUS_KEY]), to_numpy(td[ELEMENT_KEY]), to_numpy(td[DISTANCE_KEY]),
+                                to_numpy(td[ORIENTATION_KEY]))
     ]

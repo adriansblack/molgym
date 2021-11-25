@@ -1,5 +1,5 @@
 import logging
-from typing import Dict
+from typing import Dict, Sequence
 
 import numpy as np
 import torch
@@ -35,6 +35,13 @@ def count_parameters(module: torch.nn.Module) -> int:
 
 def tensor_dict_to_device(td: TensorDict, device: torch.device) -> TensorDict:
     return {k: v.to(device) for k, v in td.items()}
+
+
+def concat_tensor_dicts(tds: Sequence[TensorDict]) -> TensorDict:
+    if len(tds) == 0:
+        return {}
+
+    return {k: torch.cat([td[k] for td in tds], dim=0) for k in tds[0].keys()}
 
 
 def set_seeds(seed: int) -> None:

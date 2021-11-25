@@ -11,7 +11,7 @@ def test_addition():
     reward_fn = SparseInteractionReward()
     z_table = AtomicNumberTable(zs=[0, 1, 6, 8])
     initial_state = data.get_initial_state(atoms=Atoms('H2CO'), z_table=z_table)
-    env = DiscreteMolecularEnvironment(reward_fn=reward_fn, initial_state=initial_state, z_table=z_table, seed=0)
+    env = DiscreteMolecularEnvironment(reward_fn=reward_fn, initial_state=initial_state, z_table=z_table)
 
     # Valid action
     next_state, reward, done, _ = env.step(Action(focus=0, element=1, distance=0.0, orientation=(1.0, 0.0, 0.0)))
@@ -32,7 +32,7 @@ def test_solo_distance():
     reward_fn = SparseInteractionReward()
     z_table = AtomicNumberTable(zs=[0, 1])
     initial_state = data.get_initial_state(atoms=Atoms('H2'), z_table=z_table)
-    env = DiscreteMolecularEnvironment(reward_fn=reward_fn, initial_state=initial_state, z_table=z_table, seed=0)
+    env = DiscreteMolecularEnvironment(reward_fn=reward_fn, initial_state=initial_state, z_table=z_table)
 
     # First H can be on its own
     env.step(Action(focus=0, element=1, distance=0.0, orientation=(1.0, 0.0, 0.0)))

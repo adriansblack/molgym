@@ -1,5 +1,6 @@
+import abc
 import logging
-from typing import Tuple
+from typing import Tuple, List
 
 import ase.data
 import numpy as np
@@ -26,16 +27,25 @@ def any_too_close(
     return bool(np.any(np.linalg.norm(positions - other_positions) < threshold))
 
 
-class DiscreteMolecularEnvironment:
+class MolecularEnvironment(abc.ABC):
+    @abc.abstractmethod
+    def reset(self) -> State:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def step(self, action: Action) -> Tuple[State, float, bool, dict]:
+        raise NotImplementedError
+
+
+class DiscreteMolecularEnvironment(MolecularEnvironment):
     def __init__(
-        self,
-        reward_fn: SparseInteractionReward,
-        initial_state: DiscreteBagState,
-        z_table: AtomicNumberTable,
-        min_atomic_distance=0.6,  # Angstrom
-        max_solo_distance=2.0,  # Angstrom
-        min_reward=-0.6,  # Hartree
-        seed=0,
+            self,
+            reward_fn: SparseInteractionReward,
+            initial_state: DiscreteBagState,
+            z_table: AtomicNumberTable,
+            min_atomic_distance=0.6,  # Angstrom
+            max_solo_distance=2.0,  # Angstrom
+            min_reward=-0.6,  # Hartree
     ):
         self.reward_fn = reward_fn
         self.initial_state = initial_state
@@ -50,20 +60,13 @@ class DiscreteMolecularEnvironment:
             if ase.data.atomic_numbers[s] in self.z_table.zs
         ]
 
-        self.random_seed = seed
-        self.random_state = np.random.RandomState(self.random_seed)
         self.current_state = self.initial_state
         self.terminal = False
 
-    def seed(self, seed=None) -> int:
-        self.random_seed = seed or np.random.randint(int(1e5))
-        self.random_state = np.random.RandomState(self.random_seed)
-        return self.random_seed
-
-    def reset(self) -> None:
-        self.random_state = np.random.RandomState(self.random_seed)
+    def reset(self) -> State:
         self.current_state = self.initial_state
         self.terminal = False
+        return self.current_state
 
     def step(self, action: Action) -> Tuple[State, float, bool, dict]:
         if self.terminal:
@@ -130,3 +133,21 @@ class DiscreteMolecularEnvironment:
                 return True
 
         return False
+
+
+class EnvironmentCollection:
+    def __init__(self, envs: List[MolecularEnvironment]) -> None:
+        self.envs = envs
+
+    def __len__(self):
+        return len(self.envs)
+
+    def step(self, actions: List[Action]) -> List[Tuple[State, float, bool, dict]]:
+        assert len(self.envs) == len(actions)
+        return [env.step(action) for env, action in zip(self.envs, actions)]
+
+    def reset_all(self) -> List[State]:
+        return [env.reset() for env in self.envs]
+
+    def reset_env(self, index: int) -> State:
+        return self.envs[index].reset()

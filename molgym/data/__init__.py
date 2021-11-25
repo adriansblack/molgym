@@ -4,7 +4,7 @@ from .neighborhood import get_neighborhood
 from .tables import AtomicNumberTable, bag_is_empty
 from .trajectory import (State, DiscreteBagState, generate_sparse_reward_trajectory, reorder_breadth_first,
                          reorder_random_neighbor, get_initial_state, SARS, build_actions, propagate_discrete_bag_state,
-                         state_to_atoms, Action)
+                         state_to_atoms, Action, FOCUS_KEY, ELEMENT_KEY, DISTANCE_KEY, ORIENTATION_KEY)
 from .utils import Configuration, Configurations, load_xyz, config_from_atoms
 
 __all__ = [
@@ -12,5 +12,6 @@ __all__ = [
     'StateActionBatch', 'build_state_action_data', 'get_neighborhood', 'Configuration', 'Configurations', 'load_xyz',
     'config_from_atoms', 'AtomicNumberTable', 'bag_is_empty', 'State', 'DiscreteBagState',
     'generate_sparse_reward_trajectory', 'reorder_breadth_first', 'reorder_random_neighbor', 'get_initial_state',
-    'SARS', 'build_actions', 'propagate_discrete_bag_state', 'state_to_atoms', 'Action'
+    'SARS', 'build_actions', 'propagate_discrete_bag_state', 'state_to_atoms', 'Action', 'FOCUS_KEY', 'ELEMENT_KEY',
+    'DISTANCE_KEY', 'ORIENTATION_KEY'
 ]
