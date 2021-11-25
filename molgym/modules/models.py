@@ -34,6 +34,7 @@ class EnergyModel(torch.nn.Module):
             num_bessel=num_bessel,
             num_polynomial_cutoff=num_polynomial_cutoff,
         )
+        edge_feats_irreps = o3.Irreps(f'{self.radial_embedding.out_dim}x0e')
 
         sh_irreps = o3.Irreps.spherical_harmonics(max_ell)
         self.spherical_harmonics = o3.SphericalHarmonics(sh_irreps, normalize=True, normalization='component')
@@ -48,7 +49,7 @@ class EnergyModel(torch.nn.Module):
             node_attrs_irreps=node_attr_irreps,
             node_feats_irreps=node_feats_irreps,
             edge_attrs_irreps=sh_irreps,
-            edge_feats_irreps=o3.Irreps(f'{self.radial_embedding.out_dim}x0e'),
+            edge_feats_irreps=edge_feats_irreps,
             target_irreps=hidden_irreps,
         )
         self.interactions.append(inter)
@@ -59,7 +60,7 @@ class EnergyModel(torch.nn.Module):
                 node_attrs_irreps=node_attr_irreps,
                 node_feats_irreps=inter.irreps_out,
                 edge_attrs_irreps=sh_irreps,
-                edge_feats_irreps=o3.Irreps(f'{self.radial_embedding.out_dim}x0e'),
+                edge_feats_irreps=edge_feats_irreps,
                 target_irreps=hidden_irreps,
             )
             self.interactions.append(inter)
@@ -127,6 +128,7 @@ class SimpleModel(torch.nn.Module):
             num_bessel=num_bessel,
             num_polynomial_cutoff=num_polynomial_cutoff,
         )
+        edge_feats_irreps = o3.Irreps(f'{self.radial_embedding.out_dim}x0e')
 
         sh_irreps = o3.Irreps.spherical_harmonics(max_ell)
         self.spherical_harmonics = o3.SphericalHarmonics(sh_irreps, normalize=True, normalization='component')
@@ -136,7 +138,7 @@ class SimpleModel(torch.nn.Module):
             node_attrs_irreps=node_attr_irreps,
             node_feats_irreps=node_feats_irreps,
             edge_attrs_irreps=sh_irreps,
-            edge_feats_irreps=o3.Irreps(f'{self.radial_embedding.out_dim}x0e'),
+            edge_feats_irreps=edge_feats_irreps,
             target_irreps=hidden_irreps,
         )
         self.interactions = torch.nn.ModuleList([inter])
@@ -146,7 +148,7 @@ class SimpleModel(torch.nn.Module):
                 node_attrs_irreps=node_attr_irreps,
                 node_feats_irreps=inter.irreps_out,
                 edge_attrs_irreps=sh_irreps,
-                edge_feats_irreps=o3.Irreps(f'{self.radial_embedding.out_dim}x0e'),
+                edge_feats_irreps=edge_feats_irreps,
                 target_irreps=hidden_irreps,
             )
             self.interactions.append(inter)
