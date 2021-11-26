@@ -37,18 +37,21 @@ class QFunction(torch.nn.Module):
             gate=torch.nn.ReLU(),
         )
 
+        self.psi = modules.MLP(
+            input_dim=network_width + num_elements,
+            output_dims=(network_width, 1),
+            gate=torch.nn.ReLU(),
+        )
+
     def forward(
             self,
             batch_next: data.StateBatch,  # next state s'
     ) -> torch.Tensor:  # [n_graphs, ]
-        s_cov = self.embedding(batch_next)  # [n_nodes, n_feats]
-        s_inv = self.norm(s_cov)  # [n_nodes, n_inv]
-        s_lat = torch.cat([s_inv, batch_next.bag[batch_next.batch]], dim=-1)
+        s_cov = self.embedding(batch_next)  # [n_nodes, n_irrep]
+        s_inv = self.norm(s_cov)  # invariant node feats [n_nodes, n_inv]
+        node_prop = self.phi(s_inv)  # node propensity [n_nodes, n_width]
+        graph_prop = scatter_sum(src=node_prop, index=batch_next.batch, dim=0,
+                                 dim_size=batch_next.num_graphs)  # [n_graphs, n_width]
 
-        # Local contribution to Q value
-        q_node = self.phi(s_lat).squeeze(-1)  # [n_nodes, ]
-
-        # Sum over all nodes in graph
-        q_tot = scatter_sum(src=q_node, index=batch_next.batch, dim=-1, dim_size=batch_next.num_graphs)  # [n_graphs,]
-
-        return q_tot
+        # NOTE: for infinite bag setting, the cost of each atom and the total (remaining) volume will be needed
+        return self.psi(torch.cat([graph_prop, batch_next.bag], dim=-1)).squeeze(-1)  # [n_graphs, ]
