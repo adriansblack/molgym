@@ -4,8 +4,11 @@ from typing import Sequence, Tuple, List, Optional
 import ase.data
 import numpy as np
 
-from molgym import tools
 from . import tables
+
+POSITIONS_KEY = 'positions'
+ELEMENTS_KEY = 'elements'
+BAG_KEY = 'bag'
 
 FOCUS_KEY = 'focus'
 ELEMENT_KEY = 'element'
@@ -90,16 +93,15 @@ def state_to_atoms(state: State, z_table: tables.AtomicNumberTable) -> ase.Atoms
     )
 
 
-def get_default_action(element: int) -> Action:
-    return Action(focus=0, element=element, distance=1.5, orientation=np.array([1.0, 0.0, 0.0]))
-
-
 def get_last_action(
     elements: np.ndarray,
     positions: np.ndarray,
     focus: Optional[int],
 ) -> Action:
     assert len(elements) > 0
+
+    if len(elements) == 1:
+        return Action(focus=0, element=elements[0], distance=1.5, orientation=np.array([1.0, 0.0, 0.0]))
 
     if focus is None:
         distance = np.linalg.norm(positions[:-1] - positions[-1], axis=-1, keepdims=False)  # [n_atoms, ]
@@ -133,9 +135,9 @@ def generate_sparse_reward_trajectory(
     ]
     states = [State(elements, positions, bag) for (elements, positions), bag in zip(canvases, bags)]
 
-    actions = [get_default_action(states[1].elements[0])] + [
+    actions = [
         get_last_action(elements=state.elements, positions=state.positions, focus=focus)
-        for state, focus in zip(states[2:], focuses[1:])
+        for state, focus in zip(states[1:], focuses)
     ]
 
     num_actions = len(actions)
@@ -153,14 +155,3 @@ def generate_sparse_reward_trajectory(
             ))
 
     return tau
-
-
-def get_actions_from_td(td: tools.TensorDict) -> List[Action]:
-    return [
-        Action(focus=f, element=e, distance=d, orientation=o) for f, e, d, o in zip(
-            tools.to_numpy(td[FOCUS_KEY]),
-            tools.to_numpy(td[ELEMENT_KEY]),
-            tools.to_numpy(td[DISTANCE_KEY]),
-            tools.to_numpy(td[ORIENTATION_KEY]),
-        )
-    ]

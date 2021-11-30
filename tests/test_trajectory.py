@@ -6,11 +6,13 @@ import ase.data
 import ase.io
 import numpy as np
 import pytest
+import torch_geometric
 
+from molgym import data
 from molgym.data import AtomicNumberTable
 from molgym.data.graph_tools import generate_topology
-from molgym.data.trajectory import (Action, generate_sparse_reward_trajectory,
-                                    propagate_finite_bag_state, State, get_empty_canvas_state, state_to_atoms)
+from molgym.data.trajectory import (Action, generate_sparse_reward_trajectory, propagate_finite_bag_state, State,
+                                    get_empty_canvas_state, state_to_atoms)
 
 
 def rotation_translation_align(atoms: ase.Atoms, target: ase.Atoms) -> ase.Atoms:
@@ -110,3 +112,33 @@ def test_propagate():
     action = Action(focus=0, element=0, distance=1.5, orientation=np.array([1.5, 1.0, 1.2]))
     with pytest.raises(ValueError):
         propagate_finite_bag_state(state, action)
+
+
+def test_conversions(ethanol):
+    z_table = AtomicNumberTable([0, 1, 6, 8])
+    sars_list = generate_sparse_reward_trajectory(ethanol, z_table, final_reward=0.0)
+    batch_size = 5
+
+    dataset = [data.build_state_action_data(state=sars.state, cutoff=1.7, action=sars.action) for sars in sars_list]
+    loader = torch_geometric.loader.DataLoader(
+        dataset=dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        drop_last=True,
+    )
+
+    for i, batch in enumerate(loader):
+        sars_items = sars_list[i * batch_size:(i + 1) * batch_size]
+        actions = data.get_actions_from_td(batch)
+        states = [data.get_state_from_td(item) for item in batch.to_data_list()]
+        for sars, action, state in zip(sars_items, actions, states):
+            # Action
+            assert sars.action.focus == action.focus
+            assert sars.action.element == action.element
+            assert np.isclose(sars.action.distance, action.distance)
+            assert np.allclose(sars.action.orientation, action.orientation)
+
+            # State
+            assert np.allclose(sars.state.positions, state.positions)
+            assert np.allclose(sars.state.elements, state.elements)
+            assert np.allclose(sars.state.bag, state.bag)

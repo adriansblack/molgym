@@ -1,13 +1,14 @@
-from typing import Optional
+from typing import Optional, List
 
 import numpy as np
 import torch.utils.data
 import torch_geometric
 
-from molgym.tools import to_one_hot
+from molgym import tools
 from .neighborhood import get_neighborhood
 from .tables import AtomicNumberTable
-from .trajectory import State, Action
+from .trajectory import (State, Action, FOCUS_KEY, ELEMENT_KEY, DISTANCE_KEY, ORIENTATION_KEY, ELEMENTS_KEY,
+                         POSITIONS_KEY, BAG_KEY)
 from .utils import Configuration
 
 
@@ -44,7 +45,7 @@ def build_energy_forces_data(
     edge_index, shifts = get_neighborhood(positions=config.positions, cutoff=cutoff)
 
     indices = atomic_numbers_to_index_array(config.atomic_numbers, z_table=z_table)
-    one_hot_attrs = to_one_hot(
+    one_hot_attrs = tools.to_one_hot(
         indices=torch.tensor(indices, dtype=torch.long).unsqueeze(-1),
         num_classes=len(z_table),
     )
@@ -82,10 +83,8 @@ class StateActionBatch(torch_geometric.data.Batch, StateActionData):
 def build_state_action_data(state: State, cutoff: float, action: Optional[Action] = None) -> StateActionData:
     edge_index, shifts = get_neighborhood(positions=state.positions, cutoff=cutoff)
 
-    one_hot_attrs = to_one_hot(
-        indices=torch.tensor(state.elements, dtype=torch.long).unsqueeze(-1),
-        num_classes=len(state.bag),
-    )
+    elements = torch.tensor(state.elements, dtype=torch.long)
+    one_hot_attrs = tools.to_one_hot(indices=elements.unsqueeze(-1), num_classes=len(state.bag))
 
     return StateActionData(
         # Canvas
@@ -93,6 +92,7 @@ def build_state_action_data(state: State, cutoff: float, action: Optional[Action
         edge_index=torch.tensor(edge_index, dtype=torch.long),
         shifts=torch.tensor(shifts, dtype=torch.get_default_dtype()),
         node_attrs=one_hot_attrs.to(torch.get_default_dtype()),
+        elements=elements,
         positions=torch.tensor(state.positions, dtype=torch.get_default_dtype()),
         # Bag
         bag=torch.tensor([state.bag], dtype=torch.long),
@@ -101,4 +101,23 @@ def build_state_action_data(state: State, cutoff: float, action: Optional[Action
         element=torch.tensor(action.element, dtype=torch.long) if action else None,
         distance=torch.tensor(action.distance, dtype=torch.get_default_dtype()) if action else None,
         orientation=torch.tensor([action.orientation], dtype=torch.get_default_dtype()) if action else None,
+    )
+
+
+def get_actions_from_td(td: tools.TensorDict) -> List[Action]:
+    return [
+        Action(focus=f, element=e, distance=d, orientation=o) for f, e, d, o in zip(
+            tools.to_numpy(td[FOCUS_KEY]),
+            tools.to_numpy(td[ELEMENT_KEY]),
+            tools.to_numpy(td[DISTANCE_KEY]),
+            tools.to_numpy(td[ORIENTATION_KEY]),
+        )
+    ]
+
+
+def get_state_from_td(td: tools.TensorDict) -> State:
+    return State(
+        elements=tools.to_numpy(td[ELEMENTS_KEY]),
+        positions=tools.to_numpy(td[POSITIONS_KEY]),
+        bag=tuple(tools.to_numpy(td[BAG_KEY])),
     )
