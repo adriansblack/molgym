@@ -39,7 +39,7 @@ def rollout(
         responses: List[tools.TensorDict] = []
         for batch in data_loader:
             batch = batch.to(device)
-            response, _ = policy(batch, training=training)
+            response, _info = policy(batch, training=training)
             responses.append(response)
 
         response = tools.concat_tensor_dicts(responses)
