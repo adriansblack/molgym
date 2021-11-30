@@ -1,6 +1,5 @@
 # pylint: disable=redefined-outer-name
 import io
-from typing import Sequence
 
 import ase.build
 import ase.data
@@ -10,8 +9,8 @@ import pytest
 
 from molgym.data import AtomicNumberTable
 from molgym.data.graph_tools import generate_topology
-from molgym.data.trajectory import (Action, get_action_sequence, reorder_breadth_first,
-                                    generate_sparse_reward_trajectory, DiscreteBagState, propagate_discrete_bag_state)
+from molgym.data.trajectory import (Action, generate_sparse_reward_trajectory,
+                                    propagate_finite_bag_state, State, get_empty_canvas_state, state_to_atoms)
 
 
 def rotation_translation_align(atoms: ase.Atoms, target: ase.Atoms) -> ase.Atoms:
@@ -55,7 +54,7 @@ H   -1.0632    0.9786    0.3312
 
 
 def test_graph(ethanol):
-    graph = generate_topology(ethanol, cutoff_distance=1.6)
+    graph = generate_topology(ethanol.positions, cutoff_distance=1.6)
     assert len(graph.nodes) == 9
     assert len(graph.edges) == 8
     assert min(len(graph[n]) for n in graph.nodes) == 1
@@ -64,31 +63,20 @@ def test_graph(ethanol):
 
 def test_disjoint_graph(ethanol):
     with pytest.raises(AssertionError):
-        generate_topology(ethanol, cutoff_distance=1.0)
-
-
-def rollout_actions(actions: Sequence[Action], z_table: AtomicNumberTable) -> ase.Atoms:
-    atoms = ase.Atoms()
-
-    for action in actions:
-        if len(atoms) == 0:
-            position = np.array([0.0, 0.0, 0.0])
-        else:
-            position = atoms[action.focus].position + action.distance * np.array(action.orientation)
-
-        atoms.append(ase.Atom(symbol=z_table.index_to_z(action.element), position=position))
-
-    return atoms
+        generate_topology(ethanol.positions, cutoff_distance=1.0)
 
 
 def test_rollout(ethanol):
-    atoms = reorder_breadth_first(ethanol, cutoff_distance=1.6, seed=1)
-    z_table = AtomicNumberTable([1, 6, 8])
-    actions = get_action_sequence(atoms, z_table=z_table)
-    rolled_out = rollout_actions(actions, z_table=z_table)
-    assert atoms.symbols.get_chemical_formula() == rolled_out.symbols.get_chemical_formula()
-    aligned_atoms = rotation_translation_align(rolled_out, target=atoms)
-    rmsd = compute_rmsd(aligned_atoms, atoms)
+    z_table = AtomicNumberTable([0, 1, 6, 8])
+
+    state = get_empty_canvas_state(ethanol, z_table)
+    for sars in generate_sparse_reward_trajectory(ethanol, z_table, final_reward=0.0):
+        state = propagate_finite_bag_state(state, sars.action)
+    atoms = state_to_atoms(state, z_table)
+
+    assert ethanol.symbols.get_chemical_formula() == atoms.symbols.get_chemical_formula()
+    aligned_atoms = rotation_translation_align(atoms, target=ethanol)
+    rmsd = compute_rmsd(aligned_atoms, ethanol)
     assert rmsd < 1e-10
 
 
@@ -114,11 +102,11 @@ def test_trajectory_generation(ethanol):
 
 
 def test_propagate():
-    state = DiscreteBagState(elements=[0], positions=np.zeros((1, 3)), bag=(0, 1, 1))
-    action = Action(focus=0, element=1, distance=1.5, orientation=(1.5, 1.0, 1.2))
-    new_state = propagate_discrete_bag_state(state, action)
+    state = State(elements=np.array([0], dtype=int), positions=np.zeros((1, 3)), bag=(0, 1, 1))
+    action = Action(focus=0, element=1, distance=1.5, orientation=np.array([1.5, 1.0, 1.2]))
+    new_state = propagate_finite_bag_state(state, action)
     assert len(new_state.elements) == 1
 
-    action = Action(focus=0, element=0, distance=1.5, orientation=(1.5, 1.0, 1.2))
+    action = Action(focus=0, element=0, distance=1.5, orientation=np.array([1.5, 1.0, 1.2]))
     with pytest.raises(ValueError):
-        propagate_discrete_bag_state(state, action)
+        propagate_finite_bag_state(state, action)

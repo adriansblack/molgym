@@ -43,7 +43,7 @@ def rollout(
             responses.append(response)
 
         response = tools.concat_tensor_dicts(responses)
-        actions = data.build_actions(response)
+        actions = data.get_actions_from_td(response)
 
         tuples = envs.step(actions)
         next_states, rewards, dones, _infos = zip(*tuples)

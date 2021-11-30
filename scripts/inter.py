@@ -62,7 +62,7 @@ def main() -> None:
     policy.to(device)
 
     reward_fn = rl.SparseInteractionReward()
-    initial_state = data.get_initial_state(ase.Atoms('H2O'), z_table)
+    initial_state = data.get_empty_canvas_state(ase.Atoms('H2O'), z_table)
     logging.info('Initial state: ' + str(initial_state))
     buffer = rl.rollout(
         policy=policy,

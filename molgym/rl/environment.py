@@ -6,14 +6,11 @@ import ase.data
 import numpy as np
 
 from molgym import data
-from molgym.data import Action, State, AtomicNumberTable, DiscreteBagState
+from molgym.data import Action, State, AtomicNumberTable
 from .reward import SparseInteractionReward
 
 
 def is_terminal(state: State) -> bool:
-    if not isinstance(state, DiscreteBagState):
-        return False
-
     return data.bag_is_empty(state.bag)
 
 
@@ -41,7 +38,7 @@ class DiscreteMolecularEnvironment(MolecularEnvironment):
     def __init__(
             self,
             reward_fn: SparseInteractionReward,
-            initial_state: DiscreteBagState,
+            initial_state: State,
             z_table: AtomicNumberTable,
             min_atomic_distance=0.6,  # Angstrom
             max_solo_distance=2.0,  # Angstrom
@@ -72,7 +69,7 @@ class DiscreteMolecularEnvironment(MolecularEnvironment):
         if self.terminal:
             raise RuntimeError('Stepping with terminal state')
 
-        self.current_state = data.propagate_discrete_bag_state(self.current_state, action)
+        self.current_state = data.propagate_finite_bag_state(self.current_state, action)
 
         # Is state valid?
         if not self._is_valid_state(self.current_state):
@@ -97,6 +94,11 @@ class DiscreteMolecularEnvironment(MolecularEnvironment):
         return self.current_state, reward, done, info
 
     def _is_valid_state(self, state: State) -> bool:
+        # Check bag
+        if any(item < 0 for item in state.bag):
+            return False
+
+        # Check canvas
         if len(state.elements) <= 1:
             return True
 

@@ -1,7 +1,6 @@
 import queue
 from typing import Sequence
 
-import ase.io
 import networkx as nx
 import numpy as np
 
@@ -9,14 +8,14 @@ from .neighborhood import get_neighborhood
 
 
 def generate_topology(
-        atoms: ase.Atoms,
+        positions: np.ndarray,  # [n_atoms, 3]
         cutoff_distance: float,  # Angstrom
 ) -> nx.Graph:
-    edge_index, _shifts = get_neighborhood(positions=atoms.positions, cutoff=cutoff_distance, pbc=None)
+    edge_index, _shifts = get_neighborhood(positions=positions, cutoff=cutoff_distance, pbc=None)
     graph = nx.from_edgelist(edge_index.transpose())
 
     assert nx.is_connected(graph)
-    assert len(graph) == len(atoms)
+    assert len(graph) == positions.shape[0]
     return graph
 
 
@@ -56,10 +55,3 @@ def random_neighbor_rollout(graph: nx.Graph, seed: int) -> Sequence[int]:
 
     assert len(visited) == len(graph)
     return visited
-
-
-def select_atoms(atoms: ase.Atoms, indices: Sequence[int]) -> ase.Atoms:
-    new_atoms = ase.Atoms()
-    for index in indices:
-        new_atoms.append(atoms[index])
-    return new_atoms

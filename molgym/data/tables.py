@@ -1,4 +1,4 @@
-from typing import Sequence, Iterable, Tuple, Union
+from typing import Sequence, Iterable, Tuple
 
 
 class AtomicNumberTable:
@@ -25,12 +25,10 @@ def get_atomic_number_table_from_zs(zs: Iterable[int]) -> AtomicNumberTable:
     return AtomicNumberTable(sorted(list(z_set)))
 
 
-DiscreteBag = Tuple[int, ...]
-ContinuousBag = Tuple[float, ...]
-Bag = Union[DiscreteBag, ContinuousBag]
+Bag = Tuple[int, ...]
 
 
-def discrete_bag_from_atomic_numbers(zs: Iterable[int], z_table: AtomicNumberTable) -> DiscreteBag:
+def bag_from_atomic_numbers(zs: Iterable[int], z_table: AtomicNumberTable) -> Bag:
     bag = [0] * len(z_table)
     for z in zs:
         bag[z_table.z_to_index(z)] += 1
@@ -38,7 +36,7 @@ def discrete_bag_from_atomic_numbers(zs: Iterable[int], z_table: AtomicNumberTab
     return tuple(bag)
 
 
-def remove_element_from_bag(e: int, bag: DiscreteBag) -> DiscreteBag:
+def remove_element_from_bag(e: int, bag: Bag) -> Bag:
     if bag[e] < 1:
         raise ValueError(f"Cannot remove element with index '{e}' from '{bag}'")
 
@@ -47,5 +45,5 @@ def remove_element_from_bag(e: int, bag: DiscreteBag) -> DiscreteBag:
     return tuple(copy)
 
 
-def bag_is_empty(bag: DiscreteBag) -> bool:
-    return sum(bag) == 0
+def bag_is_empty(bag: Bag) -> bool:
+    return all(item < 1 for item in bag)

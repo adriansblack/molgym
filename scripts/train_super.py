@@ -40,12 +40,12 @@ def get_interaction_energy(config: data.Configuration, z_energies: Dict[int, flo
 
 def sample_trajectories(
     policy: rl.Policy,
-    initial_state: data.DiscreteBagState,
+    initial_state: data.State,
     cutoff: float,
     count: int,
     device: torch.device,
     training: bool,
-) -> Tuple[List[data.DiscreteBagState], List[List[data.Action]]]:
+) -> Tuple[List[data.State], List[List[data.Action]]]:
 
     terminal_states = []
     action_sequences = []
@@ -65,10 +65,10 @@ def sample_trajectories(
             batch = next(iter(loader))
             batch = batch.to(device)
             response, _ = policy(batch, training=training)
-            actions = data.build_actions(response)
+            actions = data.get_actions_from_td(response)
 
             assert len(actions) == 1
-            state = data.propagate_discrete_bag_state(state, actions[0])
+            state = data.propagate_finite_bag_state(state, actions[0])
             action_sequence.append(actions[0])
 
             if data.bag_is_empty(state.bag):
@@ -80,7 +80,7 @@ def sample_trajectories(
 
 
 def generate_atoms(
-    state: data.DiscreteBagState,
+    state: data.State,
     actions: List[data.Action],
     z_table: data.AtomicNumberTable,
 ) -> ase.Atoms:
@@ -116,13 +116,13 @@ def main() -> None:
     seed = 0
     for atoms in atoms_list:
         e_inter = get_interaction_energy(config=data.config_from_atoms(atoms), z_energies=z_energies)
-        graph = graph_tools.generate_topology(atoms, cutoff_distance=args.d_max)
+        graph = graph_tools.generate_topology(atoms.positions, cutoff_distance=args.d_max)
 
         num_paths = max(int(args.num_paths_per_atom * len(atoms)), 1)
         for _ in range(num_paths):
             sequence = graph_tools.breadth_first_rollout(graph, seed=seed)
             sars_list += data.generate_sparse_reward_trajectory(
-                atoms=graph_tools.select_atoms(atoms, sequence),
+                atoms=ase.Atoms([atoms[i] for i in sequence]),
                 final_reward=e_inter,
                 z_table=z_table,
             )
@@ -199,7 +199,7 @@ def main() -> None:
     logging.info(f'Loaded model from epoch {epoch}')
 
     # Test policy
-    initial_state = data.get_initial_state(atoms=atoms_list[0], z_table=z_table)
+    initial_state = data.get_empty_canvas_state(atoms=atoms_list[0], z_table=z_table)
     terminals, action_sequences = sample_trajectories(
         policy,
         initial_state=initial_state,
