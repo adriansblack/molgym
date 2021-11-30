@@ -8,7 +8,7 @@ import torch
 import torch_geometric
 from e3nn import o3
 
-from molgym import tools, data, rl
+from molgym import tools, data, rl, modules
 from molgym.data import graph_tools, SARS
 
 
@@ -180,7 +180,7 @@ def main() -> None:
 
     tools.train(
         model=policy,
-        loss_fn=tools.neg_log_likelihood,
+        loss_fn=modules.neg_log_likelihood,
         train_loader=train_loader,
         valid_loader=valid_loader,
         optimizer=optimizer,

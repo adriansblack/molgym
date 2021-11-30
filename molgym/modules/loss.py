@@ -27,3 +27,8 @@ class EnergyForcesLoss(torch.nn.Module):
     def __repr__(self):
         return (f'{self.__class__.__name__}(energy_weight={self.energy_weight:.3f}, '
                 f'forces_weight={self.forces_weight:.3f})')
+
+
+def neg_log_likelihood(ref: Batch, pred: TensorDict) -> torch.Tensor:
+    # logp: [n_graphs, ]
+    return -1 * torch.mean(pred['logp'])  # []

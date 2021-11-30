@@ -1,9 +1,9 @@
 from .blocks import AtomicEnergiesBlock, RadialEmbeddingBlock, LinearReadoutBlock, InteractionBlock, MLP
-from .loss import EnergyForcesLoss
+from .loss import EnergyForcesLoss, neg_log_likelihood
 from .models import EnergyModel, SimpleModel
 from .radial import BesselBasis, PolynomialCutoff
 
 __all__ = [
     'AtomicEnergiesBlock', 'RadialEmbeddingBlock', 'LinearReadoutBlock', 'PolynomialCutoff', 'BesselBasis',
-    'EnergyForcesLoss', 'InteractionBlock', 'MLP', 'EnergyModel', 'SimpleModel'
+    'EnergyForcesLoss', 'neg_log_likelihood', 'InteractionBlock', 'MLP', 'EnergyModel', 'SimpleModel'
 ]
