@@ -99,7 +99,8 @@ def test_trajectory_generation(ethanol):
     assert len(sars_last.state.elements) == len(ethanol) - 1  # canvas close to full
     assert sum(sars_last.state.bag) == 1  # one atom remaining
     assert len(sars_last.next_state.elements) == len(ethanol)  # canvas is full
-    assert sum(sars_last.next_state.bag) == 1 and sars_last.next_state.bag[0] == 1  # no atoms remaining, only sentinel
+    assert (sum(sars_last.next_state.bag) == 1
+            and sars_last.next_state.bag[0] == 1)  # no real atoms remaining, only sentinel
 
 
 def test_propagate():
@@ -123,7 +124,7 @@ def test_conversions(ethanol):
         dataset=dataset,
         batch_size=batch_size,
         shuffle=False,
-        drop_last=True,
+        drop_last=False,
     )
 
     for i, batch in enumerate(loader):
