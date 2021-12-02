@@ -11,7 +11,7 @@ from .reward import SparseInteractionReward
 
 
 def is_terminal(state: State) -> bool:
-    return data.bag_is_empty(state.bag)
+    return data.no_real_atoms_in_bag(state.bag)
 
 
 def any_too_close(
@@ -69,7 +69,7 @@ class DiscreteMolecularEnvironment(MolecularEnvironment):
         if self.terminal:
             raise RuntimeError('Stepping with terminal state')
 
-        self.current_state = data.propagate_finite_bag_state(self.current_state, action)
+        self.current_state = data.propagate_state(self.current_state, action)
 
         # Is state valid?
         if not self._is_valid_state(self.current_state):

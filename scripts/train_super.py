@@ -68,10 +68,10 @@ def sample_trajectories(
             actions = data.get_actions_from_td(response)
 
             assert len(actions) == 1
-            state = data.propagate_finite_bag_state(state, actions[0])
+            state = data.propagate_state(state, actions[0])
             action_sequence.append(actions[0])
 
-            if data.bag_is_empty(state.bag):
+            if data.no_real_atoms_in_bag(state.bag):
                 terminal_states.append(state)
                 action_sequences.append(action_sequence)
                 break
@@ -199,7 +199,7 @@ def main() -> None:
     logging.info(f'Loaded model from epoch {epoch}')
 
     # Test policy
-    initial_state = data.get_empty_canvas_state(atoms=atoms_list[0], z_table=z_table)
+    initial_state = data.get_state_from_atoms(atoms=atoms_list[0], index=0, z_table=z_table)
     terminals, action_sequences = sample_trajectories(
         policy,
         initial_state=initial_state,

@@ -7,15 +7,15 @@ from molgym.data.tables import AtomicNumberTable
 
 
 def test_conversion():
-    table = AtomicNumberTable(zs=[1, 8])
+    table = AtomicNumberTable(zs=[0, 1, 8])
     array = np.array([8, 8, 1])
     indices = atomic_numbers_to_index_array(array, z_table=table)
-    expected = np.array([1, 1, 0], dtype=int)
+    expected = np.array([2, 2, 1], dtype=int)
     assert np.allclose(expected, indices)
 
 
 class TestAtomicData:
-    table = AtomicNumberTable([1, 8])
+    table = AtomicNumberTable([0, 1, 8])
     config = Configuration(
         atomic_numbers=np.array([8, 1, 1]),
         positions=np.array([
@@ -36,7 +36,7 @@ class TestAtomicData:
 
         assert data.edge_index.shape == (2, 4)
         assert data.forces.shape == (3, 3)
-        assert data.node_attrs.shape == (3, 2)
+        assert data.node_attrs.shape == (3, 3)
 
     def test_collate(self):
         data1 = build_energy_forces_data(self.config, z_table=self.table, cutoff=3.0)

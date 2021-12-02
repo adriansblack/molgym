@@ -19,11 +19,11 @@ config = data.Configuration(
     energy=-1.5,
 )
 
-table = data.AtomicNumberTable([1, 8])
+table = data.AtomicNumberTable([0, 1, 8])
 
 
 def test_bo_model():
-    atomic_energies = np.array([1.0, 3.0], dtype=float)
+    atomic_energies = np.array([0.0, 1.0, 3.0], dtype=float)
     model = modules.EnergyModel(
         r_max=2.0,
         num_bessel=7,
@@ -35,7 +35,7 @@ def test_bo_model():
         hidden_irreps=o3.Irreps('10x0e + 10x0o + 8x1e + 8x1o + 4x2e + 4x2o'),
     )
 
-    assert tools.count_parameters(model) == 3696
+    assert tools.count_parameters(model) == 5070
 
     atomic_data = data.build_energy_forces_data(config, z_table=table, cutoff=3.0)
     data_loader = torch_geometric.loader.DataLoader([atomic_data, atomic_data], batch_size=2)

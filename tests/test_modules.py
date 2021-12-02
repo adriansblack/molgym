@@ -22,7 +22,7 @@ config = Configuration(
     energy=-1.5,
 )
 
-table = AtomicNumberTable([1, 8])
+table = AtomicNumberTable([0, 1, 8])
 
 
 def test_bessel_basis():
@@ -40,7 +40,7 @@ def test_polynomial_cutoff():
 
 
 def test_atomic_energies():
-    energies_block = AtomicEnergiesBlock(atomic_energies=np.array([1.0, 3.0]))
+    energies_block = AtomicEnergiesBlock(atomic_energies=np.array([0.0, 1.0, 3.0]))
 
     data = build_energy_forces_data(config, z_table=table, cutoff=3.0)
     data_loader = torch_geometric.loader.DataLoader([data, data], batch_size=2)

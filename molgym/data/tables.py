@@ -3,13 +3,14 @@ from typing import Sequence, Iterable, Tuple
 
 class AtomicNumberTable:
     def __init__(self, zs: Sequence[int]):
+        assert zs[0] == 0
         self.zs = zs
 
     def __len__(self) -> int:
         return len(self.zs)
 
     def __str__(self):
-        return f'{self.__class__.__name__}: {tuple(s for s in self.zs)}'
+        return f'{self.__class__.__name__}: {tuple(self.zs)}'
 
     def index_to_z(self, index: int) -> int:
         return self.zs[index]
@@ -45,5 +46,15 @@ def remove_element_from_bag(e: int, bag: Bag) -> Bag:
     return tuple(copy)
 
 
+def add_element_to_bag(e: int, bag: Bag) -> Bag:
+    copy = list(bag)
+    copy[e] += 1
+    return tuple(copy)
+
+
 def bag_is_empty(bag: Bag) -> bool:
     return all(item < 1 for item in bag)
+
+
+def no_real_atoms_in_bag(bag: Bag) -> bool:
+    return bag_is_empty(bag[1:])
