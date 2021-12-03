@@ -8,10 +8,7 @@ from e3nn import o3
 from molgym.data import StateActionBatch, FOCUS_KEY, ELEMENT_KEY, DISTANCE_KEY, ORIENTATION_KEY
 from molgym.distributions import (GaussianMixtureModel, GraphCategoricalDistribution, SO3Distribution,
                                   compute_ef_cond_entropy)
-from molgym.modules.blocks import MLP
-from molgym.modules.irreps_tools import get_merge_instructions
-from molgym.modules.models import SimpleModel
-from molgym.modules.radial import BesselBasis
+from molgym.modules import MLP, SimpleModel, BesselBasis, get_merge_instructions
 from molgym.tools import masked_softmax, to_one_hot, TensorDict
 
 

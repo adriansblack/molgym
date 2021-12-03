@@ -1,3 +1,4 @@
+import abc
 from typing import Tuple
 
 import torch
@@ -7,7 +8,22 @@ from .policy import Policy
 from .q_function import QFunction
 
 
-class SACAgent(torch.nn.Module):
+def requires_grad(module: torch.nn.Module, flag: bool) -> None:
+    for param in module.parameters():
+        param.requires_grad = flag
+
+
+class AbstractActorCritic(torch.nn.Module, abc.ABC):
+    @abc.abstractmethod
+    def freeze_q(self):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def unfreeze_q(self):
+        raise NotImplementedError
+
+
+class SACAgent(AbstractActorCritic):
     def __init__(
         self,
         r_max: float,
@@ -49,3 +65,11 @@ class SACAgent(torch.nn.Module):
                 hidden_irreps=hidden_irreps,
                 network_width=network_width,
             ) for _ in range(2))
+
+    def freeze_q(self):
+        requires_grad(self.q1, False)
+        requires_grad(self.q2, False)
+
+    def unfreeze_q(self):
+        requires_grad(self.q1, True)
+        requires_grad(self.q2, True)

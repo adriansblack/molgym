@@ -1,7 +1,6 @@
 from typing import List, Optional
 
 import torch
-import torch_geometric
 
 from molgym import data, tools
 from .environment import EnvironmentCollection
@@ -29,8 +28,8 @@ def rollout(
 
     while ((num_iters is None or iter_counter < num_iters)
            and (num_episodes is None or episode_counter < num_episodes)):
-        data_loader = torch_geometric.loader.DataLoader(
-            dataset=[data.build_state_action_data(state=state, cutoff=d_max, action=None) for state in states],
+        data_loader = data.DataLoader(
+            dataset=[data.geometrize_state_action(state=state, cutoff=d_max, action=None) for state in states],
             batch_size=batch_size,
             shuffle=False,
             drop_last=False,
@@ -43,7 +42,7 @@ def rollout(
             responses.append(response)
 
         response = tools.concat_tensor_dicts(responses)
-        actions = data.get_actions_from_td(response)
+        actions = data.actions_from_td(response)
 
         tuples = envs.step(actions)
         next_states, rewards, dones, _infos = zip(*tuples)

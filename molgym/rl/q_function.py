@@ -45,7 +45,7 @@ class QFunction(torch.nn.Module):
 
     def forward(
             self,
-            batch_next: data.StateBatch,  # next state s'
+            batch_next: data.GeometricStateBatch,  # next state, s_next
     ) -> torch.Tensor:  # [n_graphs, ]
         s_cov = self.embedding(batch_next)  # [n_nodes, n_irrep]
         s_inv = self.norm(s_cov)  # invariant node feats [n_nodes, n_inv]

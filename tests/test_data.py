@@ -2,7 +2,7 @@ import numpy as np
 import torch_geometric
 
 from molgym.data import Configuration, get_neighborhood
-from molgym.data.geometric_data import atomic_numbers_to_index_array, build_energy_forces_data
+from molgym.data.geometric_data import atomic_numbers_to_index_array, geometrize_config
 from molgym.data.tables import AtomicNumberTable
 
 
@@ -14,33 +14,24 @@ def test_conversion():
     assert np.allclose(expected, indices)
 
 
-class TestAtomicData:
+class TestConfiguration:
     table = AtomicNumberTable([0, 1, 8])
-    config = Configuration(
-        atomic_numbers=np.array([8, 1, 1]),
-        positions=np.array([
-            [0.0, -2.0, 0.0],
-            [1.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0],
-        ]),
-        forces=np.array([
-            [0.0, -1.3, 0.0],
-            [1.0, 0.2, 0.0],
-            [0.0, 1.1, 0.3],
-        ]),
-        energy=-1.5,
-    )
+    config = Configuration(atomic_numbers=np.array([8, 1, 1]),
+                           positions=np.array([
+                               [0.0, -2.0, 0.0],
+                               [1.0, 0.0, 0.0],
+                               [0.0, 1.0, 0.0],
+                           ]))
 
     def test_atomic_data(self):
-        data = build_energy_forces_data(self.config, z_table=self.table, cutoff=3.0)
+        data = geometrize_config(self.config, z_table=self.table, cutoff=3.0)
 
         assert data.edge_index.shape == (2, 4)
-        assert data.forces.shape == (3, 3)
         assert data.node_attrs.shape == (3, 3)
 
     def test_collate(self):
-        data1 = build_energy_forces_data(self.config, z_table=self.table, cutoff=3.0)
-        data2 = build_energy_forces_data(self.config, z_table=self.table, cutoff=3.0)
+        data1 = geometrize_config(self.config, z_table=self.table, cutoff=3.0)
+        data2 = geometrize_config(self.config, z_table=self.table, cutoff=3.0)
 
         assert torch_geometric.loader.DataLoader(dataset=[data1, data2], batch_size=32)
 

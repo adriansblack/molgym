@@ -1,110 +1,130 @@
-from typing import Optional, List
+from typing import Optional, List, Dict, Union
 
 import numpy as np
 import torch.utils.data
 import torch_geometric
 
 from molgym import tools
-from .neighborhood import get_neighborhood
-from .tables import AtomicNumberTable
+from . import tables, neighborhood, utils, trajectory
 from .trajectory import (State, Action, FOCUS_KEY, ELEMENT_KEY, DISTANCE_KEY, ORIENTATION_KEY, ELEMENTS_KEY,
                          POSITIONS_KEY, BAG_KEY)
-from .utils import Configuration
 
 
-def atomic_numbers_to_index_array(atomic_numbers: np.ndarray, z_table: AtomicNumberTable) -> np.ndarray:
-    to_index_fn = np.vectorize(z_table.z_to_index)
-    return to_index_fn(atomic_numbers)
+class DataLoader(torch.utils.data.DataLoader):
+    """A data loader which merges geometric data objects to a mini-batch.
+
+    Args:
+        dataset (Dataset): The dataset from which to load the data.
+        batch_size (int, optional): How many samples per batch to load.
+        shuffle (bool, optional): If set to True, the data will be reshuffled at every epoch.
+    """
+    def __init__(
+        self,
+        dataset,
+        batch_size: int = 1,
+        shuffle: bool = False,
+        drop_last: bool = False,
+    ) -> None:
+        super().__init__(
+            dataset=dataset,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            collate_fn=torch_geometric.loader.dataloader.Collater([], []),
+            drop_last=drop_last,
+        )
 
 
-class AtomicData(torch_geometric.data.Data):
+class GeometricCanvasData(torch_geometric.data.Data):
     edge_index: torch.Tensor
     node_attrs: torch.Tensor
+    elements: torch.Tensor
     positions: torch.Tensor
     shifts: torch.Tensor
 
 
-class AtomicBatch(torch_geometric.data.Batch, AtomicData):
+class GeometricCanvasBatch(torch_geometric.data.Batch, GeometricCanvasData):
     pass
 
 
-class EnergyForcesData(AtomicData):
-    forces: torch.Tensor
-    energy: torch.Tensor
-
-
-class EnergyForcesBatch(torch_geometric.data.Batch, EnergyForcesData):
-    pass
-
-
-def build_energy_forces_data(
-    config: Configuration,
-    z_table: AtomicNumberTable,
-    cutoff: float,
-) -> EnergyForcesData:
-    edge_index, shifts = get_neighborhood(positions=config.positions, cutoff=cutoff)
-
-    indices = atomic_numbers_to_index_array(config.atomic_numbers, z_table=z_table)
-    one_hot_attrs = tools.to_one_hot(
-        indices=torch.tensor(indices, dtype=torch.long).unsqueeze(-1),
-        num_classes=len(z_table),
-    )
-
-    return EnergyForcesData(
-        num_nodes=len(config.atomic_numbers),
-        edge_index=torch.tensor(edge_index, dtype=torch.long),
-        shifts=torch.tensor(shifts, dtype=torch.get_default_dtype()),
-        node_attrs=one_hot_attrs.to(torch.get_default_dtype()),
-        positions=torch.tensor(config.positions, dtype=torch.get_default_dtype()),
-        forces=torch.tensor(config.forces, dtype=torch.get_default_dtype()) if config.forces is not None else None,
-        energy=torch.tensor(config.energy, dtype=torch.get_default_dtype()) if config.energy is not None else None,
-    )
-
-
-class StateData(AtomicData):
+class GeometricStateData(GeometricCanvasData):
     bag: torch.Tensor
 
 
-class StateBatch(torch_geometric.data.Batch, StateData):
+class GeometricStateBatch(torch_geometric.data.Batch, GeometricStateData):
     pass
 
 
-class StateActionData(StateData):
+class GeometricStateActionData(GeometricStateData):
     focus: torch.Tensor
     element: torch.Tensor
     distance: torch.Tensor
     orientation: torch.Tensor
 
 
-class StateActionBatch(torch_geometric.data.Batch, StateActionData):
+class StateActionBatch(torch_geometric.data.Batch, GeometricStateActionData):
     pass
 
 
-def build_state_action_data(state: State, cutoff: float, action: Optional[Action] = None) -> StateActionData:
-    edge_index, shifts = get_neighborhood(positions=state.positions, cutoff=cutoff)
+def atomic_numbers_to_index_array(atomic_numbers: np.ndarray, z_table: tables.AtomicNumberTable) -> np.ndarray:
+    to_index_fn = np.vectorize(z_table.z_to_index)
+    return to_index_fn(atomic_numbers)
 
-    elements = torch.tensor(state.elements, dtype=torch.long)
-    one_hot_attrs = tools.to_one_hot(indices=elements.unsqueeze(-1), num_classes=len(state.bag))
 
-    return StateActionData(
-        # Canvas
-        num_nodes=len(state.elements),
+def tensorize_canvas(
+    elements: np.ndarray,  # [n, ], not Zs but indices
+    positions: np.ndarray,  # [n, 3]
+    cutoff: float,
+    num_classes: int,
+) -> Dict[str, Union[torch.Tensor, int]]:
+    assert len(elements.shape) == 1 and len(positions.shape) == 2
+    assert elements.shape[0] == positions.shape[0]
+    assert positions.shape[1] == 3
+
+    elements_tensor = torch.tensor(elements, dtype=torch.long)
+    one_hot_attrs = tools.to_one_hot(indices=elements_tensor.unsqueeze(-1), num_classes=num_classes)
+    edge_index, shifts = neighborhood.get_neighborhood(positions=positions, cutoff=cutoff)
+
+    return dict(
+        num_nodes=len(elements),
         edge_index=torch.tensor(edge_index, dtype=torch.long),
         shifts=torch.tensor(shifts, dtype=torch.get_default_dtype()),
         node_attrs=one_hot_attrs.to(torch.get_default_dtype()),
-        elements=elements,
-        positions=torch.tensor(state.positions, dtype=torch.get_default_dtype()),
-        # Bag
-        bag=torch.tensor([state.bag], dtype=torch.long),
-        # Action (optional)
-        focus=torch.tensor(action.focus, dtype=torch.long) if action else None,
-        element=torch.tensor(action.element, dtype=torch.long) if action else None,
-        distance=torch.tensor(action.distance, dtype=torch.get_default_dtype()) if action else None,
-        orientation=torch.tensor([action.orientation], dtype=torch.get_default_dtype()) if action else None,
+        elements=elements_tensor,
+        positions=torch.tensor(positions, dtype=torch.get_default_dtype()),
     )
 
 
-def get_actions_from_td(td: tools.TensorDict) -> List[Action]:
+def tensorize_bag(bag: tables.Bag) -> tools.TensorDict:
+    return dict(bag=torch.tensor([bag], dtype=torch.long))
+
+
+def geometrize_config(
+    config: utils.Configuration,
+    z_table: tables.AtomicNumberTable,
+    cutoff: float,
+) -> GeometricCanvasData:
+    element_indices = atomic_numbers_to_index_array(config.atomic_numbers, z_table=z_table)
+    info = tensorize_canvas(element_indices, config.positions, cutoff=cutoff, num_classes=len(z_table))
+    return GeometricCanvasData(**info)
+
+
+def geometrize_state(state: State, cutoff: float) -> GeometricStateData:
+    return GeometricStateData(
+        **tensorize_canvas(state.elements, state.positions, cutoff=cutoff, num_classes=len(state.bag)),
+        **tensorize_bag(state.bag),
+    )
+
+
+def tensorize_action(action: Action) -> tools.TensorDict:
+    return dict(
+        focus=torch.tensor(action.focus, dtype=torch.long),
+        element=torch.tensor(action.element, dtype=torch.long),
+        distance=torch.tensor(action.distance, dtype=torch.get_default_dtype()),
+        orientation=torch.tensor(action.orientation, dtype=torch.get_default_dtype()),
+    )
+
+
+def actions_from_td(td: tools.TensorDict) -> List[Action]:
     return [
         Action(focus=f, element=e, distance=d, orientation=o) for f, e, d, o in zip(
             tools.to_numpy(td[FOCUS_KEY]),
@@ -115,7 +135,32 @@ def get_actions_from_td(td: tools.TensorDict) -> List[Action]:
     ]
 
 
-def get_state_from_td(td: tools.TensorDict) -> State:
+def geometrize_state_action(state: State, cutoff: float, action: Optional[Action] = None) -> GeometricStateActionData:
+    info = {
+        **tensorize_canvas(state.elements, state.positions, cutoff=cutoff, num_classes=len(state.bag)),
+        **tensorize_bag(state.bag),
+    }
+
+    if action:
+        info.update(tensorize_action(action))
+
+    return GeometricStateActionData(**info)
+
+
+def process_sars(
+    sars: trajectory.SARS,
+    cutoff: float,
+) -> Dict[str, Union[torch.Tensor, tools.TensorDict, GeometricStateData]]:
+    return {
+        'state': geometrize_state(sars.state, cutoff=cutoff),
+        'action': tensorize_action(sars.action),
+        'reward': torch.tensor(sars.reward, dtype=torch.get_default_dtype()),
+        'done': torch.tensor(sars.done, dtype=torch.bool),
+        'next_state': geometrize_state(sars.next_state, cutoff=cutoff),
+    }
+
+
+def state_from_td(td: tools.TensorDict) -> State:
     return State(
         elements=tools.to_numpy(td[ELEMENTS_KEY]),
         positions=tools.to_numpy(td[POSITIONS_KEY]),

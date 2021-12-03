@@ -5,7 +5,7 @@ import torch.nn
 from e3nn import o3
 from torch_scatter import scatter_sum
 
-from molgym.data import AtomicBatch
+from molgym.data import GeometricCanvasBatch
 from .blocks import (AtomicEnergiesBlock, RadialEmbeddingBlock, LinearReadoutBlock, InteractionBlock,
                      LinearNodeEmbeddingBlock)
 from .utils import get_edge_vectors_and_lengths, compute_forces
@@ -66,7 +66,7 @@ class EnergyModel(torch.nn.Module):
             self.interactions.append(inter)
             self.readouts.append(LinearReadoutBlock(inter.irreps_out))
 
-    def forward(self, data: AtomicBatch, training=False) -> Dict[str, Any]:
+    def forward(self, data: GeometricCanvasBatch, training=False) -> Dict[str, Any]:
         # Setup
         data.positions.requires_grad = True
 
@@ -155,7 +155,7 @@ class SimpleModel(torch.nn.Module):
 
         self.irreps_out = inter.irreps_out
 
-    def forward(self, data: AtomicBatch) -> torch.Tensor:
+    def forward(self, data: GeometricCanvasBatch) -> torch.Tensor:
         # Embeddings
         vectors, lengths = get_edge_vectors_and_lengths(positions=data.positions,
                                                         edge_index=data.edge_index,

@@ -6,7 +6,6 @@ import ase.io
 import numpy as np
 import plotly.subplots
 import torch
-import torch_geometric
 from e3nn import o3
 
 from molgym import data, tools, distributions
@@ -230,10 +229,10 @@ def main():
     sars_list = data.generate_sparse_reward_trajectory(atoms, z_table, final_reward=0.0, focuses=focuses)
 
     geometric_data = [
-        data.build_state_action_data(state=item.state, cutoff=args.d_max, action=item.action) for item in sars_list
+        data.geometrize_state_action(state=item.state, cutoff=args.d_max, action=item.action) for item in sars_list
     ]
 
-    data_loader = torch_geometric.loader.DataLoader(
+    data_loader = data.DataLoader(
         dataset=geometric_data,
         batch_size=1,
         shuffle=False,

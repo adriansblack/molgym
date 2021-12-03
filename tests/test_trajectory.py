@@ -6,10 +6,8 @@ import ase.data
 import ase.io
 import numpy as np
 import pytest
-import torch_geometric
 
-from molgym import data
-from molgym.data import AtomicNumberTable
+from molgym import data, tools
 from molgym.data.graph_tools import generate_topology
 from molgym.data.trajectory import (Action, generate_sparse_reward_trajectory, propagate_state, State, state_to_atoms)
 
@@ -68,7 +66,7 @@ def test_disjoint_graph(ethanol):
 
 
 def test_rollout(ethanol):
-    z_table = AtomicNumberTable([0, 1, 6, 8])
+    z_table = data.AtomicNumberTable([0, 1, 6, 8])
 
     state = data.get_state_from_atoms(ethanol, 0, z_table)
     for sars in generate_sparse_reward_trajectory(ethanol, z_table, final_reward=0.0):
@@ -82,7 +80,7 @@ def test_rollout(ethanol):
 
 
 def test_trajectory_generation(ethanol):
-    z_table = AtomicNumberTable([0, 1, 6, 8])
+    z_table = data.AtomicNumberTable([0, 1, 6, 8])
     trajectory = generate_sparse_reward_trajectory(atoms=ethanol, z_table=z_table, final_reward=1.5)
 
     assert all(not sars.done for sars in trajectory[:-1])
@@ -114,14 +112,13 @@ def test_propagate():
         propagate_state(state, action)
 
 
-def test_conversions(ethanol):
-    z_table = AtomicNumberTable([0, 1, 6, 8])
-    sars_list = generate_sparse_reward_trajectory(ethanol, z_table, final_reward=0.0)
+def test_data_loader(ethanol):
+    z_table = data.AtomicNumberTable([0, 1, 6, 8])
+    sars_list = generate_sparse_reward_trajectory(ethanol, z_table, final_reward=1.0)
     batch_size = 5
 
-    dataset = [data.build_state_action_data(state=sars.state, cutoff=1.7, action=sars.action) for sars in sars_list]
-    loader = torch_geometric.loader.DataLoader(
-        dataset=dataset,
+    loader = data.DataLoader(
+        dataset=[data.process_sars(sars=sars, cutoff=1.7) for sars in sars_list],
         batch_size=batch_size,
         shuffle=False,
         drop_last=False,
@@ -129,16 +126,24 @@ def test_conversions(ethanol):
 
     for i, batch in enumerate(loader):
         sars_items = sars_list[i * batch_size:(i + 1) * batch_size]
-        actions = data.get_actions_from_td(batch)
-        states = [data.get_state_from_td(item) for item in batch.to_data_list()]
-        for sars, action, state in zip(sars_items, actions, states):
+
+        states = [data.state_from_td(s) for s in batch['state'].to_data_list()]
+        actions = data.actions_from_td(batch['action'])
+        rewards = tools.to_numpy(batch['reward']).tolist()
+        dones = tools.to_numpy(batch['done']).tolist()
+
+        for sars, state, action, reward, done in zip(sars_items, states, actions, rewards, dones):
+            # State
+            assert np.allclose(sars.state.positions, state.positions)
+            assert np.allclose(sars.state.elements, state.elements)
+            assert np.allclose(sars.state.bag, state.bag)
+
             # Action
             assert sars.action.focus == action.focus
             assert sars.action.element == action.element
             assert np.isclose(sars.action.distance, action.distance)
             assert np.allclose(sars.action.orientation, action.orientation)
 
-            # State
-            assert np.allclose(sars.state.positions, state.positions)
-            assert np.allclose(sars.state.elements, state.elements)
-            assert np.allclose(sars.state.bag, state.bag)
+            # Reward and Done
+            assert np.isclose(sars.reward, reward)
+            assert sars.done == done

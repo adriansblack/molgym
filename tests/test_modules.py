@@ -3,7 +3,7 @@ import torch
 import torch_geometric
 import torch_scatter
 
-from molgym.data import Configuration, AtomicNumberTable, build_energy_forces_data
+from molgym.data import Configuration, AtomicNumberTable, geometrize_config
 from molgym.modules import PolynomialCutoff, AtomicEnergiesBlock, BesselBasis
 from molgym.tools import to_numpy
 
@@ -42,7 +42,7 @@ def test_polynomial_cutoff():
 def test_atomic_energies():
     energies_block = AtomicEnergiesBlock(atomic_energies=np.array([0.0, 1.0, 3.0]))
 
-    data = build_energy_forces_data(config, z_table=table, cutoff=3.0)
+    data = geometrize_config(config, z_table=table, cutoff=3.0)
     data_loader = torch_geometric.loader.DataLoader([data, data], batch_size=2)
     batch = next(iter(data_loader))
 

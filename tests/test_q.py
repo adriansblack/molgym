@@ -28,7 +28,7 @@ def test_q():
     )
 
     data_loader = torch_geometric.loader.DataLoader(
-        dataset=[data.build_state_action_data(state=sars.state, cutoff=cutoff, action=None) for sars in tau],
+        dataset=[data.geometrize_state_action(state=sars.state, cutoff=cutoff, action=None) for sars in tau],
         batch_size=5,
         shuffle=False,
         drop_last=False,

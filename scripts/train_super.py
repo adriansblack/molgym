@@ -5,11 +5,10 @@ from typing import Dict, List, Tuple
 
 import ase.io
 import torch
-import torch_geometric
 from e3nn import o3
 
 from molgym import tools, data, rl, modules
-from molgym.data import graph_tools, SARS
+from molgym.data import graph_tools
 
 
 def add_supervised(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
@@ -55,8 +54,8 @@ def sample_trajectories(
         action_sequence = []
 
         while True:
-            loader = torch_geometric.loader.DataLoader(
-                dataset=[data.build_state_action_data(state, cutoff=cutoff, action=None)],
+            loader = data.DataLoader(
+                dataset=[data.geometrize_state_action(state, cutoff=cutoff, action=None)],
                 batch_size=1,
                 shuffle=False,
                 drop_last=False,
@@ -65,7 +64,7 @@ def sample_trajectories(
             batch = next(iter(loader))
             batch = batch.to(device)
             response, _ = policy(batch, training=training)
-            actions = data.get_actions_from_td(response)
+            actions = data.actions_from_td(response)
 
             assert len(actions) == 1
             state = data.propagate_state(state, actions[0])
@@ -112,7 +111,7 @@ def main() -> None:
     atoms_list = data.load_xyz(args.xyz)[:args.max_num_configs]
 
     # Generate SARS list
-    sars_list: List[SARS] = []
+    sars_list: List[data.SARS] = []
     seed = 0
     for atoms in atoms_list:
         e_inter = get_interaction_energy(config=data.config_from_atoms(atoms), z_energies=z_energies)
@@ -129,14 +128,14 @@ def main() -> None:
             seed += 1
 
     geometric_data = [
-        data.build_state_action_data(state=item.state, cutoff=args.d_max, action=item.action) for item in sars_list
+        data.geometrize_state_action(state=item.state, cutoff=args.d_max, action=item.action) for item in sars_list
     ]
 
     train_data, valid_data = tools.random_train_valid_split(geometric_data, valid_fraction=0.1, seed=1)
     logging.info(f'Training data: {len(train_data)}, valid data: {len(valid_data)}')
 
     train_loader, valid_loader = [
-        torch_geometric.loader.DataLoader(
+        data.DataLoader(
             dataset=dataset,
             batch_size=min(args.batch_size, len(dataset)),
             shuffle=True,
