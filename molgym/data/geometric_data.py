@@ -5,19 +5,13 @@ import torch.utils.data
 import torch_geometric
 
 from molgym import tools
-from . import tables, neighborhood, utils, trajectory
+from . import tables, utils, trajectory, graph_tools
 from .trajectory import (State, Action, FOCUS_KEY, ELEMENT_KEY, DISTANCE_KEY, ORIENTATION_KEY, ELEMENTS_KEY,
                          POSITIONS_KEY, BAG_KEY)
 
 
 class DataLoader(torch.utils.data.DataLoader):
-    """A data loader which merges geometric data objects to a mini-batch.
-
-    Args:
-        dataset (Dataset): The dataset from which to load the data.
-        batch_size (int, optional): How many samples per batch to load.
-        shuffle (bool, optional): If set to True, the data will be reshuffled at every epoch.
-    """
+    """A data loader that merges geometric data objects to a mini-batch."""
     def __init__(
         self,
         dataset,
@@ -82,7 +76,7 @@ def tensorize_canvas(
 
     elements_tensor = torch.tensor(elements, dtype=torch.long)
     one_hot_attrs = tools.to_one_hot(indices=elements_tensor.unsqueeze(-1), num_classes=num_classes)
-    edge_index, shifts = neighborhood.get_neighborhood(positions=positions, cutoff=cutoff)
+    edge_index, shifts = graph_tools.get_neighborhood(positions=positions, cutoff=cutoff)
 
     return dict(
         num_nodes=len(elements),
