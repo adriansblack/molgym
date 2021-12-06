@@ -1,3 +1,4 @@
+import collections
 import logging
 from typing import Dict, Sequence, Union
 
@@ -34,23 +35,19 @@ def count_parameters(module: torch.nn.Module) -> int:
     return int(sum(np.prod(p.shape) for p in module.parameters()))
 
 
-def tensor_dict_to_device(td: TensorDict, device: torch.device) -> TensorDict:
-    return {k: v.to(device) for k, v in td.items()}
+def detach_tensor_dict(td: TensorDict) -> TensorDict:
+    return {k: v.detach() for k, v in td.items()}
 
 
-def dict_to_device(
-    o: Dict[str, Union[torch.Tensor, torch_geometric.data.Data, TensorDict]],
-    device: torch.device,
-) -> Dict[str, Union[torch.Tensor, torch_geometric.data.Data, TensorDict]]:
-    d: Dict[str, Union[torch.Tensor, torch_geometric.data.Data, TensorDict]] = {}
+def dict_to_device(o: collections.Mapping, device: torch.device) -> Dict:
+    d = {}
     for k, v in o.items():
-        if isinstance(v, torch.Tensor):
+        if isinstance(v, (torch.Tensor, torch_geometric.data.Data)):
             d[k] = v.to(device)
-        elif isinstance(v, torch_geometric.data.Data):
-            d[k] = v.to(device)
+        elif isinstance(v, collections.Mapping):
+            d[k] = dict_to_device(v, device)
         else:
-            d[k] = tensor_dict_to_device(v, device)
-
+            raise NotImplementedError
     return d
 
 

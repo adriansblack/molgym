@@ -69,7 +69,7 @@ class DiscreteMolecularEnvironment(MolecularEnvironment):
         if self.terminal:
             raise RuntimeError('Stepping with terminal state')
 
-        self.current_state = data.propagate_state(self.current_state, action)
+        self.current_state = data.propagate(self.current_state, action)
 
         # Is state valid?
         if not self._is_valid_state(self.current_state):

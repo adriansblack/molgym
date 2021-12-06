@@ -1,4 +1,4 @@
-from typing import Tuple, Any, Dict, Optional
+from typing import Tuple, Any, Dict, Optional, Union
 
 import numpy as np
 import torch.nn
@@ -97,7 +97,7 @@ class Policy(torch.nn.Module):
         state: StateBatch,
         action: Optional[TensorDict] = None,
         training=False,
-    ) -> Tuple[TensorDict, Dict[str, Any]]:
+    ) -> Tuple[Dict[str, Union[torch.Tensor, TensorDict]], Dict[str, Any]]:
         s_inter = self.embedding(state)
         s_cov = self.bag_tp(s_inter, state.bag[state.batch])
         s_inv = self.norm(s_cov)
@@ -177,11 +177,13 @@ class Policy(torch.nn.Module):
         ]
         entropy = torch.stack(entropy_list, dim=-1).sum(dim=-1)  # [n_graphs, ]
 
-        response = {
-            FOCUS_KEY: focus,
-            ELEMENT_KEY: element,
-            DISTANCE_KEY: distance,
-            ORIENTATION_KEY: orientation,
+        response: Dict[str, Union[torch.Tensor, TensorDict]] = {
+            'action': {
+                FOCUS_KEY: focus,
+                ELEMENT_KEY: element,
+                DISTANCE_KEY: distance,
+                ORIENTATION_KEY: orientation,
+            },
             'logp': log_prob,
             'entropy': entropy,
         }

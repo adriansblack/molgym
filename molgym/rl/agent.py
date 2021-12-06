@@ -1,4 +1,3 @@
-import abc
 from typing import Tuple
 
 import torch
@@ -13,17 +12,7 @@ def requires_grad(module: torch.nn.Module, flag: bool) -> None:
         param.requires_grad = flag
 
 
-class AbstractActorCritic(torch.nn.Module, abc.ABC):
-    @abc.abstractmethod
-    def freeze_q(self):
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def unfreeze_q(self):
-        raise NotImplementedError
-
-
-class SACAgent(AbstractActorCritic):
+class SACAgent(torch.nn.Module):
     def __init__(
         self,
         r_max: float,
@@ -65,6 +54,9 @@ class SACAgent(AbstractActorCritic):
                 hidden_irreps=hidden_irreps,
                 network_width=network_width,
             ) for _ in range(2))
+
+    def forward(self, *args, **kwargs):
+        return self.policy(*args, **kwargs)
 
     def freeze_q(self):
         requires_grad(self.q1, False)

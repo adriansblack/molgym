@@ -9,6 +9,8 @@ from . import tables, utils, trajectory, graph_tools
 from .trajectory import (State, Action, FOCUS_KEY, ELEMENT_KEY, DISTANCE_KEY, ORIENTATION_KEY, ELEMENTS_KEY,
                          POSITIONS_KEY, BAG_KEY)
 
+collate_fn = torch_geometric.loader.dataloader.Collater([], [])
+
 
 class DataLoader(torch.utils.data.DataLoader):
     """A data loader that merges geometric data objects to a mini-batch."""
@@ -23,7 +25,7 @@ class DataLoader(torch.utils.data.DataLoader):
             dataset=dataset,
             batch_size=batch_size,
             shuffle=shuffle,
-            collate_fn=torch_geometric.loader.dataloader.Collater([], []),
+            collate_fn=collate_fn,
             drop_last=drop_last,
         )
 

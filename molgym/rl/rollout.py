@@ -35,14 +35,14 @@ def rollout(
             drop_last=False,
         )
 
-        responses: List[tools.TensorDict] = []
+        action_list: List[tools.TensorDict] = []
         for batch in data_loader:
             batch = tools.dict_to_device(batch, device)
             response, _info = policy(batch['state'], action=None, training=training)
-            responses.append(response)
+            action_list.append(response['action'])
 
-        response = tools.concat_tensor_dicts(responses)
-        actions = data.actions_from_td(response)
+        action_td = tools.concat_tensor_dicts(action_list)
+        actions = data.actions_from_td(action_td)
 
         tuples = envs.step(actions)
         next_states, rewards, dones, _infos = zip(*tuples)

@@ -63,14 +63,14 @@ def sample_trajectories(
 
             batch = next(iter(loader))
             batch = tools.dict_to_device(batch, device)
-            response, _ = policy(batch['state'], action=None, training=training)
+            response, _aux = policy(batch['state'], action=None, training=training)
 
             # Parse action
-            actions = data.actions_from_td(response)
+            actions = data.actions_from_td(response['action'])
             assert len(actions) == 1
             action = actions[0]
 
-            state = data.propagate_state(state, action)
+            state = data.propagate(state, action)
             action_sequence.append(action)
 
             if data.no_real_atoms_in_bag(state.bag):

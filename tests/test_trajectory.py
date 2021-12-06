@@ -9,7 +9,7 @@ import pytest
 
 from molgym import data, tools
 from molgym.data.graph_tools import generate_topology
-from molgym.data.trajectory import (Action, generate_sparse_reward_trajectory, propagate_state, State, state_to_atoms)
+from molgym.data.trajectory import (Action, generate_sparse_reward_trajectory, propagate, State, state_to_atoms)
 
 
 def rotation_translation_align(atoms: ase.Atoms, target: ase.Atoms) -> ase.Atoms:
@@ -70,7 +70,7 @@ def test_rollout(ethanol):
 
     state = data.get_state_from_atoms(ethanol, 0, z_table)
     for sars in generate_sparse_reward_trajectory(ethanol, z_table, final_reward=0.0):
-        state = propagate_state(state, sars.action)
+        state = propagate(state, sars.action)
     atoms = state_to_atoms(state, z_table)
 
     assert ethanol.symbols.get_chemical_formula() == atoms.symbols.get_chemical_formula()
@@ -104,12 +104,12 @@ def test_trajectory_generation(ethanol):
 def test_propagate():
     state = State(elements=np.array([0], dtype=int), positions=np.zeros((1, 3)), bag=(0, 1, 1))
     action = Action(focus=0, element=1, distance=1.5, orientation=np.array([1.5, 1.0, 1.2]))
-    new_state = propagate_state(state, action)
+    new_state = propagate(state, action)
     assert len(new_state.elements) == 1
 
     action = Action(focus=0, element=0, distance=1.5, orientation=np.array([1.5, 1.0, 1.2]))
     with pytest.raises(ValueError):
-        propagate_state(state, action)
+        propagate(state, action)
 
 
 def test_data_loader(ethanol):

@@ -7,7 +7,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from .checkpoint import CheckpointHandler, CheckpointState
-from .torch_tools import to_numpy, tensor_dict_to_device, dict_to_device
+from .torch_tools import to_numpy, dict_to_device
 from .utils import ProgressLogger
 
 
@@ -99,7 +99,7 @@ def evaluate(
         batch = dict_to_device(batch, device)
         output, aux = model(batch['state'], batch['action'], training=False)
         batch = dict_to_device(batch, torch.device('cpu'))
-        output = tensor_dict_to_device(output, device=torch.device('cpu'))
+        output = dict_to_device(output, torch.device('cpu'))
 
         loss = loss_fn(pred=output, ref=batch)
         total_loss += to_numpy(loss).item()

@@ -43,7 +43,7 @@ class SARS:
 Trajectory = Sequence[SARS]
 
 
-def propagate_state(state: State, action: Action) -> State:
+def propagate(state: State, action: Action) -> State:
     bag = tables.remove_element_from_bag(action.element, state.bag)
 
     # If bag is empty, add sentinel element at position 0
@@ -57,7 +57,7 @@ def propagate_state(state: State, action: Action) -> State:
             bag=bag,
         )
 
-    new_position = state.positions[action.focus] + action.distance * np.array(action.orientation)
+    new_position = state.positions[action.focus] + action.distance * action.orientation
     return State(
         elements=np.concatenate([state.elements, np.array([action.element])]),
         positions=np.concatenate([state.positions, np.expand_dims(new_position, axis=0)], axis=0),
