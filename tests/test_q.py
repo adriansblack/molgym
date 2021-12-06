@@ -2,7 +2,6 @@ import os
 
 import ase.io
 import pkg_resources
-import torch_geometric
 from e3nn import o3
 
 from molgym import data, rl
@@ -27,13 +26,13 @@ def test_q():
         network_width=32,
     )
 
-    data_loader = torch_geometric.loader.DataLoader(
-        dataset=[data.geometrize_state_action(state=sars.state, cutoff=cutoff, action=None) for sars in tau],
+    data_loader = data.DataLoader(
+        dataset=[data.process_sa(state=sars.state, cutoff=cutoff, action=None) for sars in tau],
         batch_size=5,
         shuffle=False,
         drop_last=False,
     )
 
     batch = next(iter(data_loader))
-    q_values = q(batch)
+    q_values = q(batch['state'])
     assert q_values.shape == (len(tau), )

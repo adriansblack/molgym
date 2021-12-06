@@ -45,13 +45,13 @@ class QFunction(torch.nn.Module):
 
     def forward(
             self,
-            batch_next: data.GeometricStateBatch,  # next state, s_next
+            next_state: data.StateBatch,  # next state, s_next
     ) -> torch.Tensor:  # [n_graphs, ]
-        s_cov = self.embedding(batch_next)  # [n_nodes, n_irrep]
+        s_cov = self.embedding(next_state)  # [n_nodes, n_irrep]
         s_inv = self.norm(s_cov)  # invariant node feats [n_nodes, n_inv]
         node_prop = self.phi(s_inv)  # node propensity [n_nodes, n_width]
-        graph_prop = scatter_sum(src=node_prop, index=batch_next.batch, dim=0,
-                                 dim_size=batch_next.num_graphs)  # [n_graphs, n_width]
+        graph_prop = scatter_sum(src=node_prop, index=next_state.batch, dim=0,
+                                 dim_size=next_state.num_graphs)  # [n_graphs, n_width]
 
         # NOTE: for infinite bag setting, the cost of each atom and the total (remaining) volume will be needed
-        return self.psi(torch.cat([graph_prop, batch_next.bag], dim=-1)).squeeze(-1)  # [n_graphs, ]
+        return self.psi(torch.cat([graph_prop, next_state.bag], dim=-1)).squeeze(-1)  # [n_graphs, ]

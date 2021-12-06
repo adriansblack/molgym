@@ -55,20 +55,23 @@ def sample_trajectories(
 
         while True:
             loader = data.DataLoader(
-                dataset=[data.geometrize_state_action(state, cutoff=cutoff, action=None)],
+                dataset=[data.process_sa(state, cutoff=cutoff, action=None)],
                 batch_size=1,
                 shuffle=False,
                 drop_last=False,
             )
 
             batch = next(iter(loader))
-            batch = batch.to(device)
-            response, _ = policy(batch, training=training)
-            actions = data.actions_from_td(response)
+            batch = tools.dict_to_device(batch, device)
+            response, _ = policy(batch['state'], action=None, training=training)
 
+            # Parse action
+            actions = data.actions_from_td(response)
             assert len(actions) == 1
-            state = data.propagate_state(state, actions[0])
-            action_sequence.append(actions[0])
+            action = actions[0]
+
+            state = data.propagate_state(state, action)
+            action_sequence.append(action)
 
             if data.no_real_atoms_in_bag(state.bag):
                 terminal_states.append(state)
@@ -127,9 +130,7 @@ def main() -> None:
             )
             seed += 1
 
-    geometric_data = [
-        data.geometrize_state_action(state=item.state, cutoff=args.d_max, action=item.action) for item in sars_list
-    ]
+    geometric_data = [data.process_sa(state=item.state, cutoff=args.d_max, action=item.action) for item in sars_list]
 
     train_data, valid_data = tools.random_train_valid_split(geometric_data, valid_fraction=0.1, seed=1)
     logging.info(f'Training data: {len(train_data)}, valid data: {len(valid_data)}')

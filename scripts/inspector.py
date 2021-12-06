@@ -217,10 +217,11 @@ def main():
     device = tools.init_device(args.device)
     tools.set_default_dtype(args.default_dtype)
 
+    # Load model and data
     model = torch.load(f=args.model, map_location=device)
-
     atoms = ase.io.read(args.xyz, format='extxyz', index=args.index)
 
+    # Parse Z table
     z_table = data.AtomicNumberTable([int(z) for z in args.zs.split(',')])
     symbols = [ase.data.chemical_symbols[z] for z in z_table.zs]
 
@@ -228,20 +229,16 @@ def main():
     assert len(focuses) == len(atoms) if focuses is not None else True
     sars_list = data.generate_sparse_reward_trajectory(atoms, z_table, final_reward=0.0, focuses=focuses)
 
-    geometric_data = [
-        data.geometrize_state_action(state=item.state, cutoff=args.d_max, action=item.action) for item in sars_list
-    ]
-
     data_loader = data.DataLoader(
-        dataset=geometric_data,
+        dataset=[data.process_sa(state=item.state, cutoff=args.d_max, action=item.action) for item in sars_list],
         batch_size=1,
         shuffle=False,
         drop_last=False,
     )
 
     for batch in data_loader:
-        batch = batch.to(device)
-        output, aux = model(batch)
+        batch = tools.dict_to_device(batch, device)
+        output, aux = model(batch['state'], batch['action'])
 
         # Visualize
         fig = plotly.subplots.make_subplots(

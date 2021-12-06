@@ -1,8 +1,9 @@
 import logging
-from typing import Dict, Sequence
+from typing import Dict, Sequence, Union
 
 import numpy as np
 import torch
+import torch_geometric
 import torch_scatter
 
 TensorDict = Dict[str, torch.Tensor]
@@ -35,6 +36,22 @@ def count_parameters(module: torch.nn.Module) -> int:
 
 def tensor_dict_to_device(td: TensorDict, device: torch.device) -> TensorDict:
     return {k: v.to(device) for k, v in td.items()}
+
+
+def dict_to_device(
+    o: Dict[str, Union[torch.Tensor, torch_geometric.data.Data, TensorDict]],
+    device: torch.device,
+) -> Dict[str, Union[torch.Tensor, torch_geometric.data.Data, TensorDict]]:
+    d: Dict[str, Union[torch.Tensor, torch_geometric.data.Data, TensorDict]] = {}
+    for k, v in o.items():
+        if isinstance(v, torch.Tensor):
+            d[k] = v.to(device)
+        elif isinstance(v, torch_geometric.data.Data):
+            d[k] = v.to(device)
+        else:
+            d[k] = tensor_dict_to_device(v, device)
+
+    return d
 
 
 def concat_tensor_dicts(tds: Sequence[TensorDict]) -> TensorDict:

@@ -28,7 +28,7 @@ class DataLoader(torch.utils.data.DataLoader):
         )
 
 
-class GeometricCanvasData(torch_geometric.data.Data):
+class CanvasData(torch_geometric.data.Data):
     edge_index: torch.Tensor
     node_attrs: torch.Tensor
     elements: torch.Tensor
@@ -36,26 +36,15 @@ class GeometricCanvasData(torch_geometric.data.Data):
     shifts: torch.Tensor
 
 
-class GeometricCanvasBatch(torch_geometric.data.Batch, GeometricCanvasData):
+class CanvasBatch(torch_geometric.data.Batch, CanvasData):
     pass
 
 
-class GeometricStateData(GeometricCanvasData):
+class StateData(CanvasData):
     bag: torch.Tensor
 
 
-class GeometricStateBatch(torch_geometric.data.Batch, GeometricStateData):
-    pass
-
-
-class GeometricStateActionData(GeometricStateData):
-    focus: torch.Tensor
-    element: torch.Tensor
-    distance: torch.Tensor
-    orientation: torch.Tensor
-
-
-class StateActionBatch(torch_geometric.data.Batch, GeometricStateActionData):
+class StateBatch(torch_geometric.data.Batch, StateData):
     pass
 
 
@@ -96,14 +85,14 @@ def geometrize_config(
     config: utils.Configuration,
     z_table: tables.AtomicNumberTable,
     cutoff: float,
-) -> GeometricCanvasData:
+) -> CanvasData:
     element_indices = atomic_numbers_to_index_array(config.atomic_numbers, z_table=z_table)
     info = tensorize_canvas(element_indices, config.positions, cutoff=cutoff, num_classes=len(z_table))
-    return GeometricCanvasData(**info)
+    return CanvasData(**info)
 
 
-def geometrize_state(state: State, cutoff: float) -> GeometricStateData:
-    return GeometricStateData(
+def geometrize_state(state: State, cutoff: float) -> StateData:
+    return StateData(
         **tensorize_canvas(state.elements, state.positions, cutoff=cutoff, num_classes=len(state.bag)),
         **tensorize_bag(state.bag),
     )
@@ -129,22 +118,23 @@ def actions_from_td(td: tools.TensorDict) -> List[Action]:
     ]
 
 
-def geometrize_state_action(state: State, cutoff: float, action: Optional[Action] = None) -> GeometricStateActionData:
-    info = {
-        **tensorize_canvas(state.elements, state.positions, cutoff=cutoff, num_classes=len(state.bag)),
-        **tensorize_bag(state.bag),
-    }
+def process_sa(
+    state: State,
+    cutoff: float,
+    action: Optional[Action] = None,
+) -> Dict[str, Union[tools.TensorDict, StateData]]:
+    info: Dict[str, Union[tools.TensorDict, StateData]] = {'state': geometrize_state(state, cutoff)}
 
     if action:
-        info.update(tensorize_action(action))
+        info['action'] = tensorize_action(action)
 
-    return GeometricStateActionData(**info)
+    return info
 
 
 def process_sars(
     sars: trajectory.SARS,
     cutoff: float,
-) -> Dict[str, Union[torch.Tensor, tools.TensorDict, GeometricStateData]]:
+) -> Dict[str, Union[torch.Tensor, tools.TensorDict, StateData]]:
     return {
         'state': geometrize_state(sars.state, cutoff=cutoff),
         'action': tensorize_action(sars.action),

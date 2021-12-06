@@ -57,4 +57,4 @@ def bag_is_empty(bag: Bag) -> bool:
 
 
 def no_real_atoms_in_bag(bag: Bag) -> bool:
-    return bag_is_empty(bag[1:])
+    return all(item < 1 for item in bag[1:])

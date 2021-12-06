@@ -4,11 +4,10 @@ from typing import Dict, Any, Tuple, Callable
 
 import numpy as np
 import torch
-import torch_geometric
 from torch.utils.data import DataLoader
 
 from .checkpoint import CheckpointHandler, CheckpointState
-from .torch_tools import to_numpy, tensor_dict_to_device
+from .torch_tools import to_numpy, tensor_dict_to_device, dict_to_device
 from .utils import ProgressLogger
 
 
@@ -67,14 +66,14 @@ def train(
 def take_step(
     model: torch.nn.Module,
     loss_fn: Callable,
-    batch: torch_geometric.data.Batch,
+    batch: Dict,
     optimizer: torch.optim.Optimizer,
     device: torch.device,
 ) -> Tuple[float, Dict[str, Any]]:
     start_time = time.time()
-    batch = batch.to(device)
+    batch = dict_to_device(batch, device)
     optimizer.zero_grad()
-    output, _aux = model(batch, training=True)
+    output, _aux = model(batch['state'], batch['action'], training=True)
     loss = loss_fn(pred=output, ref=batch)
     loss.backward()
     optimizer.step()
@@ -97,9 +96,9 @@ def evaluate(
 
     start_time = time.time()
     for batch in data_loader:
-        batch = batch.to(device)
-        output, aux = model(batch, training=False)
-        batch = batch.cpu()
+        batch = dict_to_device(batch, device)
+        output, aux = model(batch['state'], batch['action'], training=False)
+        batch = dict_to_device(batch, torch.device('cpu'))
         output = tensor_dict_to_device(output, device=torch.device('cpu'))
 
         loss = loss_fn(pred=output, ref=batch)

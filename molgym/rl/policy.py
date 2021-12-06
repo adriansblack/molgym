@@ -1,11 +1,11 @@
-from typing import Tuple, Any, Dict
+from typing import Tuple, Any, Dict, Optional
 
 import numpy as np
 import torch.nn
 import torch_scatter
 from e3nn import o3
 
-from molgym.data import StateActionBatch, FOCUS_KEY, ELEMENT_KEY, DISTANCE_KEY, ORIENTATION_KEY
+from molgym.data import FOCUS_KEY, ELEMENT_KEY, DISTANCE_KEY, ORIENTATION_KEY, StateBatch
 from molgym.distributions import (GaussianMixtureModel, GraphCategoricalDistribution, SO3Distribution,
                                   compute_ef_cond_entropy)
 from molgym.modules import MLP, SimpleModel, BesselBasis, get_merge_instructions
@@ -92,18 +92,23 @@ class Policy(torch.nn.Module):
                                        internal_weights=False)
         self.mix_tp_weights = o3.Linear(o3.Irreps(f'{num_bessel}x0e'), o3.Irreps(f'{self.mix_tp.weight_numel}x0e'))
 
-    def forward(self, data: StateActionBatch, training=False) -> Tuple[TensorDict, Dict[str, Any]]:
-        s_inter = self.embedding(data)
-        s_cov = self.bag_tp(s_inter, data.bag[data.batch])
+    def forward(
+        self,
+        state: StateBatch,
+        action: Optional[TensorDict] = None,
+        training=False,
+    ) -> Tuple[TensorDict, Dict[str, Any]]:
+        s_inter = self.embedding(state)
+        s_cov = self.bag_tp(s_inter, state.bag[state.batch])
         s_inv = self.norm(s_cov)
 
         focus_logits = self.phi_focus(s_inv).squeeze(-1)  # [n_nodes, ]
-        focus_probs = torch_scatter.scatter_softmax(src=focus_logits, index=data.batch, dim=-1)  # [num_nodes,]
-        focus_distr = GraphCategoricalDistribution(probs=focus_probs, batch=data.batch, ptr=data.ptr)
+        focus_probs = torch_scatter.scatter_softmax(src=focus_logits, index=state.batch, dim=-1)  # [num_nodes,]
+        focus_distr = GraphCategoricalDistribution(probs=focus_probs, batch=state.batch, ptr=state.ptr)
 
         # Focus
-        if hasattr(data, 'focus') and data.focus is not None:
-            focus = data.focus
+        if action is not None:
+            focus = action[FOCUS_KEY]
         elif training:
             focus = focus_distr.sample()
         else:
@@ -111,12 +116,12 @@ class Policy(torch.nn.Module):
 
         # Element
         all_element_logits = self.phi_element(s_inv)  # [n_nodes, n_z]
-        all_element_probs = masked_softmax(all_element_logits, mask=(data.bag > 0)[data.batch])  # [n_nodes, n_z]
-        focused_element_probs = all_element_probs[focus + data.ptr[:-1]]  # [n_graphs, n_z]
+        all_element_probs = masked_softmax(all_element_logits, mask=(state.bag > 0)[state.batch])  # [n_nodes, n_z]
+        focused_element_probs = all_element_probs[focus + state.ptr[:-1]]  # [n_graphs, n_z]
         element_distr = torch.distributions.Categorical(probs=focused_element_probs)
 
-        if hasattr(data, 'element') and data.element is not None:
-            element = data.element
+        if action is not None:
+            element = action[ELEMENT_KEY]
         elif training:
             element = element_distr.sample()
         else:
@@ -125,7 +130,7 @@ class Policy(torch.nn.Module):
         element_oh = to_one_hot(element.unsqueeze(-1), num_classes=self.num_elements)
 
         # Distance
-        focused_inv = s_inv[focus + data.ptr[:-1]]
+        focused_inv = s_inv[focus + state.ptr[:-1]]
         d_input = torch.cat([focused_inv, element_oh], dim=-1)  # [n_graphs, n_hidden + n_z]
         gmm_log_probs, d_mean_trans = self.phi_distance(d_input).split(self.num_gaussians, dim=-1)
         d_mean = torch.tanh(d_mean_trans) * self.d_half_width + self.d_center
@@ -133,21 +138,21 @@ class Policy(torch.nn.Module):
                                        means=d_mean,
                                        stds=torch.exp(self.d_log_stds).clamp(min=1e-6))
 
-        if hasattr(data, 'distance') and data.distance is not None:
-            distance = data.distance
+        if action is not None:
+            distance = action[DISTANCE_KEY]
         elif training:
             distance = d_distr.sample()
         else:
             distance = d_distr.argmax()
 
         # Orientation
-        focused_cov = s_cov[focus + data.ptr[:-1]]
+        focused_cov = s_cov[focus + state.ptr[:-1]]
         tp_weights = self.mix_tp_weights(self.bessel_fn(distance.unsqueeze(-1)))
         cond_cov = self.mix_tp(focused_cov, element_oh, tp_weights)  # [n_graphs, irreps]
         spherical_distr = SO3Distribution(cond_cov, lmax=self.ell_max, gamma=self.gamma)
 
-        if hasattr(data, 'orientation') and data.orientation is not None:
-            orientation = data.orientation
+        if action is not None:
+            orientation = action[ORIENTATION_KEY]
         elif training:
             orientation = spherical_distr.sample()
         else:
@@ -167,8 +172,8 @@ class Policy(torch.nn.Module):
             focus_distr.entropy(),
             compute_ef_cond_entropy(focus_probs=focus_probs,
                                     element_probs=all_element_probs,
-                                    batch=data.batch,
-                                    num_graphs=data.num_graphs),
+                                    batch=state.batch,
+                                    num_graphs=state.num_graphs),
         ]
         entropy = torch.stack(entropy_list, dim=-1).sum(dim=-1)  # [n_graphs, ]
 
