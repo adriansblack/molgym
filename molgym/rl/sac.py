@@ -8,12 +8,13 @@ from .agent import SACAgent
 
 
 def compute_loss_q(
-        ac: SACAgent,
-        ac_target: SACAgent,
-        batch: Dict,
-        gamma: float,
-        alpha: float,
-        cutoff: float,  # Angstrom
+    ac: SACAgent,
+    ac_target: SACAgent,
+    batch: Dict,
+    gamma: float,
+    alpha: float,
+    cutoff: float,  # Angstrom
+    device: torch.device,
 ) -> torch.Tensor:
 
     # Bellman backup for Q functions
@@ -21,12 +22,13 @@ def compute_loss_q(
         # Target actions come from *current* policy
         response, _aux = ac.policy(batch['next_state'])
         s_next_next = data.propagate_batch(batch['next_state'], response['action'], cutoff=cutoff)
+        s_next_next.to(device)
 
         # Target Q-values
-        q1_pi_target = ac_target.q1(s_next_next)  # [B, ]
-        q2_pi_target = ac_target.q2(s_next_next)  # [B, ]
-        q_pi_target = torch.minimum(q1_pi_target, q2_pi_target)
-        backup = batch['reward'] + gamma * (1 - batch['done']) * (q_pi_target - alpha * response['logp'])
+        q1_target = ac_target.q1(s_next_next)  # [B, ]
+        q2_target = ac_target.q2(s_next_next)  # [B, ]
+        q_target = torch.minimum(q1_target, q2_target)
+        backup = batch['reward'] + gamma * (1 - batch['done']) * (q_target - alpha * response['logp'])
 
     # MSE loss against Bellman backup
     q1 = ac.q1(batch['next_state'])
@@ -39,17 +41,25 @@ def compute_loss_q(
     return loss
 
 
-def compute_surrogate_loss_policy(ac: SACAgent, batch: Dict, alpha: float, cutoff: float) -> torch.Tensor:
+def compute_surrogate_loss_policy(
+    ac: SACAgent,
+    batch: Dict,
+    alpha: float,
+    cutoff: float,
+    device: torch.device,
+) -> torch.Tensor:
     response, _aux = ac.policy(batch['state'])
     actions = tools.detach_tensor_dict(response['action'])  # don't take gradient through samples
     s_next = data.propagate_batch(batch['next_state'], actions, cutoff=cutoff)
+    s_next.to(device)
 
-    q1_pi = ac.q1(s_next)  # [B, ]
-    q2_pi = ac.q2(s_next)  # [B, ]
-    q_pi = torch.minimum(q1_pi, q2_pi)
+    q1 = ac.q1(s_next)  # [B, ]
+    q2 = ac.q2(s_next)  # [B, ]
+    q = torch.minimum(q1, q2)
 
     # Entropy-regularized policy loss surrogate
-    loss = ((alpha * response['logp'].detach() + alpha - q_pi) * response['logp']).mean()
+    # q_pi.detach() just to be sure
+    loss = ((alpha * response['logp'].detach() + alpha - q.detach()) * response['logp']).mean()
 
     return loss
 
@@ -73,7 +83,7 @@ def train(
 
         # First run one gradient descent step for Q1 and Q2
         q_optimizer.zero_grad()
-        loss_q = compute_loss_q(ac, ac_target, batch, gamma, alpha, cutoff=cutoff)
+        loss_q = compute_loss_q(ac, ac_target, batch, gamma=gamma, alpha=alpha, cutoff=cutoff, device=device)
         loss_q.backward()
         q_optimizer.step()
 
@@ -83,7 +93,7 @@ def train(
 
         # Next run one gradient descent step for pi.
         pi_optimizer.zero_grad()
-        loss_pi = compute_surrogate_loss_policy(ac, batch, alpha, cutoff=cutoff)
+        loss_pi = compute_surrogate_loss_policy(ac, batch, alpha=alpha, cutoff=cutoff, device=device)
         loss_pi.backward()
         pi_optimizer.step()
 

@@ -52,6 +52,7 @@ def rollout(
             sars_list.append(data.SARS(s, a, r, next_s, d))
 
         for i, sars_list in enumerate(sars_lists):
+            # possible that we end up with more trajectories than num_episodes
             if sars_list[-1].done:
                 buffer += sars_list
                 sars_list.clear()
