@@ -1,6 +1,6 @@
 import collections
 import logging
-from typing import Dict, Sequence, Union
+from typing import Dict, Sequence
 
 import numpy as np
 import torch
