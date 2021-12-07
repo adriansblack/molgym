@@ -7,7 +7,7 @@ from .environment import EnvironmentCollection
 
 
 def rollout(
-    policy,
+    agent: torch.nn.Module,
     envs: EnvironmentCollection,
     num_steps: Optional[int],
     num_episodes: Optional[int],  # can be more, in practice
@@ -38,7 +38,7 @@ def rollout(
         action_list: List[tools.TensorDict] = []
         for batch in data_loader:
             batch = tools.dict_to_device(batch, device)
-            response, _info = policy(batch['state'], action=None, training=training)
+            response, _info = agent(state=batch['state'], action=None, training=training)
             action_list.append(response['action'])
 
         action_td = tools.concat_tensor_dicts(action_list)
@@ -51,12 +51,12 @@ def rollout(
         for tau, s, a, r, next_s, d in zip(unfinished_taus, states, actions, rewards, next_states, dones):
             tau.append(data.SARS(s, a, r, next_s, d))
 
-        for i, tau in enumerate(unfinished_taus):
+        for i in range(len(envs)):
             # possible that we end up with more trajectories than num_episodes
-            if tau[-1].done:
-                taus.append(tau)
+            if unfinished_taus[i][-1].done:
+                taus.append(unfinished_taus[i])
                 episode_counter += 1
-                unfinished_taus[i] = []  # clear list
+                unfinished_taus[i] = []
                 next_states[i] = envs.reset_env(i)
 
         states = next_states

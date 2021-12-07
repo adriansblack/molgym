@@ -4,12 +4,12 @@ import torch
 from torch.optim import Optimizer
 
 from molgym import tools, data
-from .agent import SACAgent
+from .agent import SACAgent, SACTarget
 
 
 def compute_loss_q(
     ac: SACAgent,
-    ac_target: SACAgent,
+    ac_target: SACTarget,
     batch: Dict,
     gamma: float,
     alpha: float,
@@ -66,7 +66,7 @@ def compute_surrogate_loss_policy(
 
 def train(
     ac: SACAgent,
-    ac_target: SACAgent,
+    ac_target: SACTarget,
     q_optimizer: Optimizer,
     pi_optimizer: Optimizer,
     data_loader: data.DataLoader,

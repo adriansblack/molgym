@@ -1,3 +1,4 @@
+from .agent import SACAgent, SACTarget
 from .environment import DiscreteMolecularEnvironment, EnvironmentCollection
 from .policy import Policy
 from .q_function import QFunction
@@ -6,5 +7,5 @@ from .rollout import rollout
 
 __all__ = [
     'MolecularReward', 'SparseInteractionReward', 'DiscreteMolecularEnvironment', 'EnvironmentCollection', 'rollout',
-    'Policy', 'QFunction'
+    'Policy', 'QFunction', 'SACAgent', 'SACTarget'
 ]

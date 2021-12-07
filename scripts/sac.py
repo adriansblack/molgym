@@ -31,7 +31,7 @@ def main() -> None:
     logging.info(z_table)
 
     # Create modules
-    policy = rl.Policy(
+    agent = rl.SACAgent(
         r_max=args.r_max,
         num_bessel=args.num_radial_basis,
         num_polynomial_cutoff=args.num_cutoff_basis,
@@ -44,21 +44,26 @@ def main() -> None:
         min_max_distance=(args.d_min, args.d_max),
         gamma=args.gamma,
     )
-    policy.to(device)
-    logging.info(policy)
-    logging.info(f'Number of parameters: {tools.count_parameters(policy)}')
+    agent.to(device)
+    logging.info(agent)
+    target = rl.SACTarget(agent)
+    target.to(device)
+    logging.info(target)
+    logging.info(f'Number of parameters: {sum(tools.count_parameters(m) for m in [agent, target])}')
 
+    # Set up environment(s)
     reward_fn = rl.SparseInteractionReward()
     initial_state = data.get_state_from_atoms(ase.Atoms('H2O'), index=0, z_table=z_table)
     logging.info('Initial state: ' + str(initial_state))
+    envs = rl.EnvironmentCollection(
+        [rl.DiscreteMolecularEnvironment(reward_fn, initial_state, z_table) for _ in range(3)])
 
     num_iterations = 3
     trajectories: List[data.Trajectory] = []
     for _ in range(num_iterations):
         new_trajectories = rl.rollout(
-            policy=policy,
-            envs=rl.EnvironmentCollection(
-                [rl.DiscreteMolecularEnvironment(reward_fn, initial_state, z_table) for _ in range(3)]),
+            agent=agent,
+            envs=envs,
             num_steps=12,
             num_episodes=None,
             d_max=args.d_max,
@@ -66,6 +71,10 @@ def main() -> None:
             training=True,
             device=device,
         )
+
+        trajectories += new_trajectories
+
+    print(trajectories)
 
 
 if __name__ == '__main__':

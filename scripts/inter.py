@@ -48,7 +48,7 @@ def main() -> None:
     initial_state = data.get_state_from_atoms(ase.Atoms('H2O'), index=0, z_table=z_table)
     logging.info('Initial state: ' + str(initial_state))
     taus = rl.rollout(
-        policy=policy,
+        agent=policy,
         envs=rl.EnvironmentCollection(
             [rl.DiscreteMolecularEnvironment(reward_fn, initial_state, z_table) for _ in range(3)]),
         num_steps=12,

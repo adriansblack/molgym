@@ -52,7 +52,7 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument('--d_min', help='minimum distance (in Ang)', type=float, default=0.9)
     parser.add_argument('--d_max', help='maximum distance (in Ang)', type=float, default=1.8)
 
-    # Path generation
+    # RL
     parser.add_argument('--num_paths_per_atom',
                         help='number of paths per atom in configuration',
                         type=float,

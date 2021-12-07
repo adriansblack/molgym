@@ -1,3 +1,4 @@
+import copy
 from typing import Tuple
 
 import torch
@@ -65,3 +66,14 @@ class SACAgent(torch.nn.Module):
     def unfreeze_q(self):
         requires_grad(self.q1, True)
         requires_grad(self.q2, True)
+
+
+class SACTarget(torch.nn.Module):
+    def __init__(self, agent: SACAgent):
+        super().__init__()
+        # https://discuss.pytorch.org/t/are-there-any-recommended-methods-to-clone-a-model/483/2
+        self.q1 = copy.deepcopy(agent.q1)
+        self.q2 = copy.deepcopy(agent.q2)
+
+    def forward(self, *args, **kwargs):
+        raise NotImplementedError
