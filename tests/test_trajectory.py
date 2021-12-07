@@ -102,7 +102,7 @@ def test_trajectory_generation(ethanol):
 
 
 def test_propagate():
-    state = State(elements=np.array([0], dtype=int), positions=np.zeros((1, 3)), bag=(0, 1, 1))
+    state = State(elements=np.array([0], dtype=int), positions=np.zeros((1, 3)), bag=np.array([0, 1, 1], dtype=int))
     action = Action(focus=0, element=1, distance=1.5, orientation=np.array([1.5, 1.0, 1.2]))
     new_state = propagate(state, action)
     assert len(new_state.elements) == 1

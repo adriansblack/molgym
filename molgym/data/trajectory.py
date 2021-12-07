@@ -1,10 +1,10 @@
 from dataclasses import dataclass
-from typing import Sequence, List, Optional
+from typing import Iterable, Sequence, List, Optional
 
 import ase.data
 import numpy as np
 
-from . import tables
+from .utils import Elements, Positions, AtomicNumberTable
 
 POSITIONS_KEY = 'positions'
 ELEMENTS_KEY = 'elements'
@@ -14,6 +14,39 @@ FOCUS_KEY = 'focus'
 ELEMENT_KEY = 'element'
 DISTANCE_KEY = 'distance'
 ORIENTATION_KEY = 'orientation'
+
+Bag = np.ndarray
+
+
+def bag_from_atomic_numbers(zs: Iterable[int], z_table: AtomicNumberTable) -> Bag:
+    bag = [0] * len(z_table)
+    for z in zs:
+        bag[z_table.z_to_index(z)] += 1
+
+    return np.array(bag, dtype=int)
+
+
+def remove_element_from_bag(e: int, bag: Bag) -> Bag:
+    if bag[e] < 1:
+        raise ValueError(f"Cannot remove element with index '{e}' from '{bag}'")
+
+    copy = bag.copy()
+    copy[e] -= 1
+    return copy
+
+
+def add_element_to_bag(e: int, bag: Bag) -> Bag:
+    copy = bag.copy()
+    copy[e] += 1
+    return copy
+
+
+def bag_is_empty(bag: Bag) -> bool:
+    return np.all(bag < 1)  # type: ignore
+
+
+def no_real_atoms_in_bag(bag: Bag) -> bool:
+    return np.all(bag[1:] < 1)  # type: ignore
 
 
 @dataclass
@@ -26,9 +59,9 @@ class Action:
 
 @dataclass
 class State:
-    elements: np.ndarray  # indices, not Zs
-    positions: np.ndarray
-    bag: tables.Bag
+    elements: Elements  # indices, not Zs
+    positions: Positions
+    bag: Bag
 
 
 @dataclass
@@ -44,11 +77,11 @@ Trajectory = Sequence[SARS]
 
 
 def propagate(state: State, action: Action) -> State:
-    bag = tables.remove_element_from_bag(action.element, state.bag)
+    bag = remove_element_from_bag(action.element, state.bag)
 
     # If bag is empty, add sentinel element at position 0
-    if tables.bag_is_empty(bag):
-        bag = tables.add_element_to_bag(0, bag)
+    if bag_is_empty(bag):
+        bag = add_element_to_bag(0, bag)
 
     if len(state.elements) == 1 and state.elements[0] == 0:
         return State(
@@ -65,7 +98,7 @@ def propagate(state: State, action: Action) -> State:
     )
 
 
-def state_to_atoms(state: State, z_table: tables.AtomicNumberTable) -> ase.Atoms:
+def state_to_atoms(state: State, z_table: AtomicNumberTable) -> ase.Atoms:
     return ase.Atoms(
         symbols=[ase.data.chemical_symbols[z_table.index_to_z(e)] for e in state.elements],
         positions=state.positions,
@@ -102,7 +135,7 @@ def get_action(
     )
 
 
-def get_state_from_atoms(atoms: ase.Atoms, index: int, z_table: tables.AtomicNumberTable) -> State:
+def get_state_from_atoms(atoms: ase.Atoms, index: int, z_table: AtomicNumberTable) -> State:
     placed, remaining = atoms[:index], atoms[index:]
     if index == 0:
         elements = np.array([0], dtype=int)
@@ -112,16 +145,15 @@ def get_state_from_atoms(atoms: ase.Atoms, index: int, z_table: tables.AtomicNum
         positions = placed.positions
 
     if index >= len(atoms):
-        bag = tables.bag_from_atomic_numbers(zs=[0], z_table=z_table)
+        bag = bag_from_atomic_numbers(zs=[0], z_table=z_table)
     else:
-        bag = tables.bag_from_atomic_numbers(zs=(ase.data.atomic_numbers[s] for s in remaining.symbols),
-                                             z_table=z_table)
+        bag = bag_from_atomic_numbers(zs=(ase.data.atomic_numbers[s] for s in remaining.symbols), z_table=z_table)
     return State(elements, positions, bag)
 
 
 def generate_sparse_reward_trajectory(
     atoms: ase.Atoms,
-    z_table: tables.AtomicNumberTable,
+    z_table: AtomicNumberTable,
     final_reward: float,
     focuses: Optional[List[Optional[int]]] = None,
 ) -> Trajectory:

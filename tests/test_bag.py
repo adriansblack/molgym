@@ -2,7 +2,7 @@ import ase.data
 import pytest
 
 from molgym.data import AtomicNumberTable
-from molgym.data.tables import bag_from_atomic_numbers, remove_element_from_bag
+from molgym.data.trajectory import bag_from_atomic_numbers, remove_element_from_bag
 
 
 def test_discrete_bag():

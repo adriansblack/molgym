@@ -5,9 +5,9 @@ import torch.utils.data
 import torch_geometric
 
 from molgym import tools
-from . import tables, utils, trajectory, graph_tools
+from . import utils, trajectory, graph_tools
 from .trajectory import (State, Action, FOCUS_KEY, ELEMENT_KEY, DISTANCE_KEY, ORIENTATION_KEY, ELEMENTS_KEY,
-                         POSITIONS_KEY, BAG_KEY)
+                         POSITIONS_KEY, BAG_KEY, Bag)
 
 collate_fn = torch_geometric.loader.dataloader.Collater([], [])
 
@@ -50,7 +50,7 @@ class StateBatch(torch_geometric.data.Batch, StateData):
     pass
 
 
-def atomic_numbers_to_index_array(atomic_numbers: np.ndarray, z_table: tables.AtomicNumberTable) -> np.ndarray:
+def atomic_numbers_to_index_array(atomic_numbers: np.ndarray, z_table: utils.AtomicNumberTable) -> np.ndarray:
     to_index_fn = np.vectorize(z_table.z_to_index)
     return to_index_fn(atomic_numbers)
 
@@ -79,13 +79,13 @@ def tensorize_canvas(
     )
 
 
-def tensorize_bag(bag: tables.Bag) -> tools.TensorDict:
+def tensorize_bag(bag: Bag) -> tools.TensorDict:
     return dict(bag=torch.tensor([bag], dtype=torch.long))
 
 
 def geometrize_config(
     config: utils.Configuration,
-    z_table: tables.AtomicNumberTable,
+    z_table: utils.AtomicNumberTable,
     cutoff: float,
 ) -> CanvasData:
     element_indices = atomic_numbers_to_index_array(config.atomic_numbers, z_table=z_table)
@@ -150,5 +150,5 @@ def state_from_td(td: tools.TensorDict) -> State:
     return State(
         elements=tools.to_numpy(td[ELEMENTS_KEY]),
         positions=tools.to_numpy(td[POSITIONS_KEY]),
-        bag=tuple(tools.to_numpy(td[BAG_KEY])),
+        bag=tools.to_numpy(td[BAG_KEY]),
     )
