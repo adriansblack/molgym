@@ -15,7 +15,7 @@ def rollout(
     batch_size: int,
     device: torch.device,
     training=False,
-) -> List[data.SARS]:
+) -> List[data.Trajectory]:
     assert num_steps is not None or num_episodes is not None
 
     num_iters = num_steps // len(envs) if num_steps is not None else None
@@ -23,8 +23,8 @@ def rollout(
     episode_counter = 0
 
     states = envs.reset_all()
-    sars_lists: List[List[data.SARS]] = [[] for _ in range(len(envs))]
-    buffer: List[data.SARS] = []
+    unfinished_taus: List[List[data.SARS]] = [[] for _ in range(len(envs))]
+    taus: List[data.Trajectory] = []
 
     while ((num_iters is None or iter_counter < num_iters)
            and (num_episodes is None or episode_counter < num_episodes)):
@@ -48,18 +48,18 @@ def rollout(
         next_states, rewards, dones, _infos = zip(*tuples)
         next_states = list(next_states)
 
-        for sars_list, s, a, r, next_s, d in zip(sars_lists, states, actions, rewards, next_states, dones):
-            sars_list.append(data.SARS(s, a, r, next_s, d))
+        for tau, s, a, r, next_s, d in zip(unfinished_taus, states, actions, rewards, next_states, dones):
+            tau.append(data.SARS(s, a, r, next_s, d))
 
-        for i, sars_list in enumerate(sars_lists):
+        for i, tau in enumerate(unfinished_taus):
             # possible that we end up with more trajectories than num_episodes
-            if sars_list[-1].done:
-                buffer += sars_list
-                sars_list.clear()
+            if tau[-1].done:
+                taus.append(tau)
                 episode_counter += 1
+                unfinished_taus[i] = []  # clear list
                 next_states[i] = envs.reset_env(i)
 
         states = next_states
         iter_counter += 1
 
-    return buffer
+    return taus

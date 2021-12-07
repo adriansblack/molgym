@@ -1,6 +1,6 @@
 import argparse
 import logging
-from typing import Dict
+from typing import List
 
 import ase
 from e3nn import o3
@@ -9,17 +9,19 @@ from molgym import tools, data, rl
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
-    parser.add_argument('--z_energies', help='atomic energy of elements (e.g.,: z1:e1, z2:e2)', type=str, required=True)
+    parser.add_argument('--zs', help='atomic numbers (e.g.,: 1,6,7,8)', type=str, required=True)
     return parser
 
 
-def parse_z_energies(z_energies: str) -> Dict[int, float]:
-    d = {0: 0.0}
-    for item in z_energies.split(','):
-        z_str, e_str = item.split(':')
-        d[int(z_str)] = float(e_str)
+def prepare_zs(zs_str: str) -> List[int]:
+    z_ints = sorted(int(i) for i in zs_str.split(','))
+    assert z_ints[0] >= 0
 
-    return d
+    # First Z has to be 0
+    if z_ints[0] != 0:
+        z_ints.insert(0, 0)
+
+    return z_ints
 
 
 def main() -> None:
@@ -36,11 +38,11 @@ def main() -> None:
     tools.set_default_dtype(args.default_dtype)
 
     # Create energies and Z table
-    z_energies = parse_z_energies(args.z_energies)
-    logging.info('Atomic energies: {' + ', '.join(f'{k}: {v:.4f}' for k, v in z_energies.items()) + '}')
-    z_table = data.AtomicNumberTable(sorted(z_energies.keys()))
+    zs = prepare_zs(args.zs)
+    z_table = data.AtomicNumberTable(zs)
     logging.info(z_table)
 
+    # Create modules
     policy = rl.Policy(
         r_max=args.r_max,
         num_bessel=args.num_radial_basis,
@@ -55,30 +57,27 @@ def main() -> None:
         gamma=args.gamma,
     )
     policy.to(device)
+    logging.info(policy)
+    logging.info(f'Number of parameters: {tools.count_parameters(policy)}')
 
     reward_fn = rl.SparseInteractionReward()
     initial_state = data.get_state_from_atoms(ase.Atoms('H2O'), index=0, z_table=z_table)
     logging.info('Initial state: ' + str(initial_state))
-    taus = rl.rollout(
-        policy=policy,
-        envs=rl.EnvironmentCollection(
-            [rl.DiscreteMolecularEnvironment(reward_fn, initial_state, z_table) for _ in range(3)]),
-        num_steps=12,
-        num_episodes=None,
-        d_max=args.d_max,
-        batch_size=args.batch_size,
-        training=True,
-        device=device,
-    )
 
-    for tau in taus:
-        for sars in tau:
-            print(sars.state)
-        print(tau[-1].next_state)
-        print(f'Reward: {tau[-1].reward}')
-        print('----------')
-
-    logging.info('Done')
+    num_iterations = 3
+    trajectories: List[data.Trajectory] = []
+    for _ in range(num_iterations):
+        new_trajectories = rl.rollout(
+            policy=policy,
+            envs=rl.EnvironmentCollection(
+                [rl.DiscreteMolecularEnvironment(reward_fn, initial_state, z_table) for _ in range(3)]),
+            num_steps=12,
+            num_episodes=None,
+            d_max=args.d_max,
+            batch_size=args.batch_size,
+            training=True,
+            device=device,
+        )
 
 
 if __name__ == '__main__':
