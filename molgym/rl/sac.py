@@ -7,14 +7,6 @@ from molgym import tools, data
 from .agent import SACAgent
 
 
-def propagate_batch(states: data.StateData, actions: tools.TensorDict, cutoff: float) -> data.StateData:
-    s_list = [data.state_from_td(state) for state in states.to_data_list()]
-    a_list = data.actions_from_td(actions)
-    s_next_list = [data.propagate(s, a) for s, a in zip(s_list, a_list)]
-    s_next_processed = [data.process_sa(s_next, cutoff=cutoff) for s_next in s_next_list]
-    return data.collate_fn(s_next_processed)
-
-
 def compute_loss_q(
         ac: SACAgent,
         ac_target: SACAgent,
@@ -23,43 +15,43 @@ def compute_loss_q(
         alpha: float,
         cutoff: float,  # Angstrom
 ) -> torch.Tensor:
-    q1 = ac.q1(batch['next_state'])
-    q2 = ac.q2(batch['next_state'])
 
     # Bellman backup for Q functions
     with torch.no_grad():
         # Target actions come from *current* policy
         response, _aux = ac.policy(batch['next_state'])
-        s_next_next = propagate_batch(batch['next_state'], response['action'], cutoff=cutoff)
+        s_next_next = data.propagate_batch(batch['next_state'], response['action'], cutoff=cutoff)
 
         # Target Q-values
-        q1_pi_target = ac_target.q1(s_next_next)  # [n_states, ]
-        q2_pi_target = ac_target.q2(s_next_next)  # [n_states, ]
+        q1_pi_target = ac_target.q1(s_next_next)  # [B, ]
+        q2_pi_target = ac_target.q2(s_next_next)  # [B, ]
         q_pi_target = torch.minimum(q1_pi_target, q2_pi_target)
         backup = batch['reward'] + gamma * (1 - batch['done']) * (q_pi_target - alpha * response['logp'])
 
     # MSE loss against Bellman backup
+    q1 = ac.q1(batch['next_state'])
+    q2 = ac.q2(batch['next_state'])
+
     loss_q1 = ((q1 - backup)**2).mean()
     loss_q2 = ((q2 - backup)**2).mean()
-    loss_q = loss_q1 + loss_q2
+    loss = loss_q1 + loss_q2
 
-    return loss_q
+    return loss
 
 
-def compute_loss_pi(ac: SACAgent, batch: Dict, alpha: float, cutoff: float) -> torch.Tensor:
+def compute_surrogate_loss_policy(ac: SACAgent, batch: Dict, alpha: float, cutoff: float) -> torch.Tensor:
     response, _aux = ac.policy(batch['state'])
     actions = tools.detach_tensor_dict(response['action'])  # don't take gradient through samples
-    s_next = propagate_batch(batch['next_state'], actions, cutoff=cutoff)
+    s_next = data.propagate_batch(batch['next_state'], actions, cutoff=cutoff)
 
-    q1_pi = ac.q1(s_next)
-    q2_pi = ac.q2(s_next)
-
+    q1_pi = ac.q1(s_next)  # [B, ]
+    q2_pi = ac.q2(s_next)  # [B, ]
     q_pi = torch.minimum(q1_pi, q2_pi)
 
-    # Entropy-regularized policy loss
-    loss_pi = ((alpha * response['logp'].detach() + alpha - q_pi) * response['logp']).mean()
+    # Entropy-regularized policy loss surrogate
+    loss = ((alpha * response['logp'].detach() + alpha - q_pi) * response['logp']).mean()
 
-    return loss_pi
+    return loss
 
 
 def train(
@@ -71,7 +63,7 @@ def train(
     gamma: float,
     alpha: float,
     polyak: float,
-    cutoff: float,
+    cutoff: float,  # Angstrom
     device: torch.device,
 ) -> None:
     """Updates the actor-critic."""
@@ -91,7 +83,7 @@ def train(
 
         # Next run one gradient descent step for pi.
         pi_optimizer.zero_grad()
-        loss_pi = compute_loss_pi(ac, batch, alpha, cutoff=cutoff)
+        loss_pi = compute_surrogate_loss_policy(ac, batch, alpha, cutoff=cutoff)
         loss_pi.backward()
         pi_optimizer.step()
 

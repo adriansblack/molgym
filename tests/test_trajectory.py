@@ -6,6 +6,7 @@ import ase.data
 import ase.io
 import numpy as np
 import pytest
+import torch
 
 from molgym import data, tools
 from molgym.data.graph_tools import generate_topology
@@ -147,3 +148,25 @@ def test_data_loader(ethanol):
             # Reward and Done
             assert np.isclose(sars.reward, reward)
             assert sars.done == done
+
+
+def test_batch_propagate(ethanol):
+    cutoff = 1.7
+    z_table = data.AtomicNumberTable([0, 1, 6, 8])
+    sars_list = generate_sparse_reward_trajectory(ethanol, z_table, final_reward=1.0)
+    loader = data.DataLoader(
+        dataset=[data.process_sars(sars=sars, cutoff=cutoff) for sars in sars_list],
+        batch_size=3,
+        shuffle=False,
+        drop_last=False,
+    )
+
+    for i, batch in enumerate(loader):
+        propagated = data.propagate_batch(batch['state'], batch['action'], cutoff=cutoff)
+        if i == 0:
+            # the agent places the atom in the centre
+            assert torch.allclose(batch['next_state'].positions[1:], propagated.positions[1:])
+        else:
+            assert torch.allclose(batch['next_state'].positions, propagated.positions)
+        assert torch.all(batch['next_state'].elements == propagated.elements)
+        assert torch.all(batch['next_state'].bag == propagated.bag)

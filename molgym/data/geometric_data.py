@@ -7,7 +7,7 @@ import torch_geometric
 from molgym import tools
 from . import utils, trajectory, graph_tools
 from .trajectory import (State, Action, FOCUS_KEY, ELEMENT_KEY, DISTANCE_KEY, ORIENTATION_KEY, ELEMENTS_KEY,
-                         POSITIONS_KEY, BAG_KEY, Bag)
+                         POSITIONS_KEY, BAG_KEY, Bag, propagate)
 
 collate_fn = torch_geometric.loader.dataloader.Collater([], [])
 
@@ -148,7 +148,15 @@ def process_sars(
 
 def state_from_td(td: tools.TensorDict) -> State:
     return State(
-        elements=tools.to_numpy(td[ELEMENTS_KEY]),
-        positions=tools.to_numpy(td[POSITIONS_KEY]),
-        bag=tools.to_numpy(td[BAG_KEY]),
+        elements=tools.to_numpy(td[ELEMENTS_KEY]).reshape(-1),
+        positions=tools.to_numpy(td[POSITIONS_KEY]).reshape(-1, 3),
+        bag=tools.to_numpy(td[BAG_KEY]).reshape(-1),
     )
+
+
+def propagate_batch(states: StateData, actions: tools.TensorDict, cutoff: float) -> StateData:
+    state_list = [state_from_td(state) for state in states.to_data_list()]
+    action_list = actions_from_td(actions)
+    next_state_list = [propagate(s, a) for s, a in zip(state_list, action_list)]
+    next_states_processed = [geometrize_state(s_next, cutoff=cutoff) for s_next in next_state_list]
+    return collate_fn(next_states_processed)
