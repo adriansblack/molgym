@@ -9,19 +9,8 @@ from molgym import tools, data, rl
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
-    parser.add_argument('--zs', help='atomic numbers (e.g.,: 1,6,7,8)', type=str, required=True)
+    parser.add_argument('--zs', help='atomic numbers (e.g.: 1,6,7,8)', type=str, required=True)
     return parser
-
-
-def prepare_zs(zs_str: str) -> List[int]:
-    z_ints = sorted(int(i) for i in zs_str.split(','))
-    assert z_ints[0] >= 0
-
-    # First Z has to be 0
-    if z_ints[0] != 0:
-        z_ints.insert(0, 0)
-
-    return z_ints
 
 
 def main() -> None:
@@ -37,9 +26,8 @@ def main() -> None:
     device = tools.init_device(args.device)
     tools.set_default_dtype(args.default_dtype)
 
-    # Create energies and Z table
-    zs = prepare_zs(args.zs)
-    z_table = data.AtomicNumberTable(zs)
+    # Create Z table
+    z_table = data.AtomicNumberTable(tools.parse_zs(args.zs))
     logging.info(z_table)
 
     # Create modules

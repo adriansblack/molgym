@@ -1,6 +1,5 @@
 import argparse
 import logging
-from typing import Dict
 
 import ase
 from e3nn import o3
@@ -9,17 +8,8 @@ from molgym import tools, data, rl
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
-    parser.add_argument('--z_energies', help='atomic energy of elements (e.g.,: z1:e1, z2:e2)', type=str, required=True)
+    parser.add_argument('--zs', help='atomic numbers (e.g.: 1,6,7,8)', type=str, required=True)
     return parser
-
-
-def parse_z_energies(z_energies: str) -> Dict[int, float]:
-    d = {0: 0.0}
-    for item in z_energies.split(','):
-        z_str, e_str = item.split(':')
-        d[int(z_str)] = float(e_str)
-
-    return d
 
 
 def main() -> None:
@@ -36,9 +26,7 @@ def main() -> None:
     tools.set_default_dtype(args.default_dtype)
 
     # Create energies and Z table
-    z_energies = parse_z_energies(args.z_energies)
-    logging.info('Atomic energies: {' + ', '.join(f'{k}: {v:.4f}' for k, v in z_energies.items()) + '}')
-    z_table = data.AtomicNumberTable(sorted(z_energies.keys()))
+    z_table = data.AtomicNumberTable(tools.parse_zs(args.zs))
     logging.info(z_table)
 
     policy = rl.Policy(
