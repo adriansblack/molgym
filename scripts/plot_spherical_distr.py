@@ -25,13 +25,13 @@ def loss_fn(spherical: SO3Distribution, data: torch.Tensor) -> torch.Tensor:
     return -1 * torch.sum(spherical.log_prob(data))  # sum over S and B (B=1)
 
 
-def optimize_parameters(coeffs: torch.Tensor, lmax: int, gamma: float, data: torch.Tensor, max_num_epochs=5000):
+def optimize_parameters(coeffs: torch.Tensor, lmax: int, beta: float, data: torch.Tensor, max_num_epochs=5000):
     optimizer = torch.optim.Adam(params=[coeffs], lr=1E-2, amsgrad=True)
 
     prev_loss = np.inf
     for i in range(max_num_epochs):
         optimizer.zero_grad()
-        spherical = SO3Distribution(a_lms=coeffs, lmax=lmax, gamma=gamma)
+        spherical = SO3Distribution(a_lms=coeffs, lmax=lmax, beta=beta)
         loss = loss_fn(spherical, data)
         loss.backward()
         optimizer.step()
@@ -43,7 +43,7 @@ def optimize_parameters(coeffs: torch.Tensor, lmax: int, gamma: float, data: tor
             print(f'Converged after {i+1} steps')
             break
 
-    spherical = SO3Distribution(a_lms=coeffs, lmax=lmax, gamma=gamma)
+    spherical = SO3Distribution(a_lms=coeffs, lmax=lmax, beta=beta)
     print(f'Final loss {loss_fn(spherical, data).item():.3f}')
 
 
@@ -126,7 +126,7 @@ def main():
     num_datapoints = 1
     num_samples = 25
     lmax = 3
-    gamma = 30
+    beta = 30
 
     # Note: sample, batch, event (S, B, E)
     data1 = torch.cat([
@@ -142,9 +142,9 @@ def main():
 
     # Optimize coefficients
     coeffs = torch.randn(data.shape[1], (lmax + 1)**2, requires_grad=True)
-    optimize_parameters(coeffs, lmax=lmax, gamma=gamma, data=data)
+    optimize_parameters(coeffs, lmax=lmax, beta=beta, data=data)
 
-    spherical = SO3Distribution(a_lms=coeffs, lmax=lmax, gamma=gamma)
+    spherical = SO3Distribution(a_lms=coeffs, lmax=lmax, beta=beta)
     print(spherical)
 
     # Compute logp's on mesh and sample

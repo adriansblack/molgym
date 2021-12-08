@@ -26,7 +26,7 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument('--num_radial_basis', help='number of radial basis functions', type=int, default=8)
     parser.add_argument('--num_cutoff_basis', help='number of basis functions for smooth cutoff', type=int, default=6)
     parser.add_argument('--max_ell', help=r'highest \ell of spherical harmonics', type=int, default=3)
-    parser.add_argument('--gamma', help='gamma parameter of spherical distribution', required=False, default=30)
+    parser.add_argument('--beta', help='beta parameter of spherical distribution', required=False, default=30)
     parser.add_argument('--num_interactions', help='number of interactions', type=int, default=3)
     parser.add_argument('--hidden_irreps',
                         help='irreps for hidden node states',
@@ -37,10 +37,10 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
 
     # Loss and optimization
     parser.add_argument('--batch_size', help='batch size', type=int, default=32)
-    parser.add_argument('--lr', help='Learning rate of optimizer', type=float, default=0.001)
-    parser.add_argument('--lr_scheduler_gamma', help='Gamma of learning rate scheduler', type=float, default=0.9993)
+    parser.add_argument('--lr', help='learning rate of optimizer', type=float, default=0.001)
+    parser.add_argument('--lr_scheduler_gamma', help='gamma of learning rate scheduler', type=float, default=0.9993)
     parser.add_argument('--weight_decay', help='weight decay (L2 penalty)', type=float, default=5e-5)
-    parser.add_argument('--max_num_epochs', help='Maximum number of epochs', type=int, default=128)
+    parser.add_argument('--max_num_epochs', help='maximum number of epochs', type=int, default=128)
     parser.add_argument('--eval_interval', help='evaluate model every <n> epochs', type=int, default=2)
     parser.add_argument('--keep_checkpoints', help='keep all checkpoints', action='store_true', default=False)
     parser.add_argument('--restart_latest',
@@ -57,5 +57,11 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
                         help='number of paths per atom in configuration',
                         type=float,
                         default=0.5)
+    parser.add_argument('--alpha', help='alpha term in maximum entropy RL', type=float, default=0.2)
+    parser.add_argument('--polyak',
+                        help='interpolation factor in polyak averaging for target networks',
+                        type=float,
+                        default=0.995)
+    parser.add_argument('--gamma', help='discount factor', type=float, default=1.0)
 
     return parser

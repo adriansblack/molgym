@@ -7,7 +7,7 @@ from .utils import parse_zs, setup_logger, get_tag, get_optimizer, ProgressLogge
 
 __all__ = [
     'TensorDict', 'to_numpy', 'to_one_hot', 'masked_softmax', 'build_default_arg_parser', 'set_seeds', 'init_device',
-    'parse_zs', 'setup_logger', 'get_tag', 'count_parameters', 'set_default_dtype', 'concat_tensor_dicts', 'dict_to_device',
-    'get_optimizer', 'ProgressLogger', 'CheckpointHandler', 'CheckpointIO', 'CheckpointState',
+    'parse_zs', 'setup_logger', 'get_tag', 'count_parameters', 'set_default_dtype', 'concat_tensor_dicts',
+    'dict_to_device', 'get_optimizer', 'ProgressLogger', 'CheckpointHandler', 'CheckpointIO', 'CheckpointState',
     'random_train_valid_split', 'train', 'detach_tensor_dict'
 ]

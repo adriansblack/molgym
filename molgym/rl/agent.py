@@ -26,7 +26,7 @@ class SACAgent(torch.nn.Module):
         network_width: int,
         num_gaussians: int,
         min_max_distance: Tuple[float, float],
-        gamma: float,
+        beta: float,
     ):
         super().__init__()
 
@@ -41,7 +41,7 @@ class SACAgent(torch.nn.Module):
             network_width=network_width,
             num_gaussians=num_gaussians,
             min_max_distance=min_max_distance,
-            gamma=gamma,
+            beta=beta,
         )
 
         self.q1, self.q2 = tuple(

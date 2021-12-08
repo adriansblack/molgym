@@ -3,6 +3,7 @@ import logging
 from typing import List
 
 import ase
+import torch
 from e3nn import o3
 
 from molgym import tools, data, rl
@@ -42,7 +43,7 @@ def main() -> None:
         network_width=args.network_width,
         num_gaussians=args.num_gaussians,
         min_max_distance=(args.d_min, args.d_max),
-        gamma=args.gamma,
+        beta=args.beta,
     )
     agent.to(device)
     logging.info(agent)
@@ -50,6 +51,29 @@ def main() -> None:
     target.to(device)
     logging.info(target)
     logging.info(f'Number of parameters: {sum(tools.count_parameters(m) for m in [agent, target])}')
+
+    # Optimizers
+    pi_optimizer = torch.optim.AdamW(
+        params=[{
+            'name': 'policy',
+            'params': agent.policy.parameters(),
+        }],
+        lr=args.lr,
+        weight_decay=args.weight_decay,
+        amsgrad=True,
+    )
+    q_optimizer = torch.optim.AdamW(
+        params=[{
+            'name': 'q1',
+            'params': agent.q1.parameters(),
+        }, {
+            'name': 'q2',
+            'params': agent.q2.parameters(),
+        }],
+        lr=args.lr,
+        weight_decay=args.weight_decay,
+        amsgrad=True,
+    )
 
     # Set up environment(s)
     reward_fn = rl.SparseInteractionReward()
@@ -73,6 +97,26 @@ def main() -> None:
         )
 
         trajectories += new_trajectories
+
+        data_loader = data.DataLoader(
+            dataset=[data.process_sars(sars=sars, cutoff=args.d_max) for tau in trajectories for sars in tau],
+            batch_size=args.batch_size,
+            shuffle=True,
+            drop_last=True,
+        )
+
+        rl.train_sac(
+            ac=agent,
+            ac_target=target,
+            q_optimizer=q_optimizer,
+            pi_optimizer=pi_optimizer,
+            data_loader=data_loader,
+            gamma=args.gamma,
+            alpha=args.alpha,
+            polyak=args.polyak,
+            cutoff=args.d_max,
+            device=device,
+        )
 
     print(trajectories)
 

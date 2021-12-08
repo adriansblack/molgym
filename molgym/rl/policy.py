@@ -25,13 +25,13 @@ class Policy(torch.nn.Module):
         network_width: int,
         num_gaussians: int,
         min_max_distance: Tuple[float, float],
-        gamma: float,
+        beta: float,
     ):
         super().__init__()
 
         self.num_elements = num_elements
         self.ell_max = max_ell
-        self.gamma = gamma
+        self.beta = beta
 
         # Embedding
         self.embedding = SimpleModel(
@@ -149,7 +149,7 @@ class Policy(torch.nn.Module):
         focused_cov = s_cov[focus + state.ptr[:-1]]
         tp_weights = self.mix_tp_weights(self.bessel_fn(distance.unsqueeze(-1)))
         cond_cov = self.mix_tp(focused_cov, element_oh, tp_weights)  # [n_graphs, irreps]
-        spherical_distr = SO3Distribution(cond_cov, lmax=self.ell_max, gamma=self.gamma)
+        spherical_distr = SO3Distribution(cond_cov, lmax=self.ell_max, beta=self.beta)
 
         if action is not None:
             orientation = action[ORIENTATION_KEY]

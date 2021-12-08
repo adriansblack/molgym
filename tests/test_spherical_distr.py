@@ -38,7 +38,7 @@ def test_uniform_argmax():
 def test_so3distr_max():
     lmax = 3
     a_lms = torch.randn(size=torch.Size((5, (lmax + 1)**2)))
-    distr = SO3Distribution(a_lms=a_lms, lmax=lmax, gamma=100)
+    distr = SO3Distribution(a_lms=a_lms, lmax=lmax, beta=100)
     assert distr.get_max_log_prob().shape == (5, )
 
 
@@ -58,10 +58,10 @@ def test_so3distr_sample():
 
     samples_shape = (2048, )
     lmax = 3
-    gamma = 25
+    beta = 25
     a_lms = torch.randn(size=torch.Size((2, (lmax + 1)**2)))
 
-    distr = SO3Distribution(a_lms=a_lms, lmax=lmax, gamma=gamma)
+    distr = SO3Distribution(a_lms=a_lms, lmax=lmax, beta=beta)
 
     samples = distr.sample(samples_shape)
     assert samples.shape == samples_shape + distr.batch_shape + distr.event_shape
@@ -70,12 +70,12 @@ def test_so3distr_sample():
     mean_angles = np.mean(angles, axis=0)  # [B, 2]
     assert mean_angles.shape == (2, 2)
 
-    distr_1 = SO3Distribution(a_lms=a_lms[[0]], lmax=lmax, gamma=gamma)
+    distr_1 = SO3Distribution(a_lms=a_lms[[0]], lmax=lmax, beta=beta)
     samples_1 = distr_1.sample(samples_shape)
     angles_1 = cartesian_to_spherical(to_numpy(samples_1))  # [S, 1, 2]
     mean_angles_1 = np.mean(angles_1, axis=0)  # [1, 2]
 
-    distr_2 = SO3Distribution(a_lms=a_lms[[1]], lmax=lmax, gamma=gamma)
+    distr_2 = SO3Distribution(a_lms=a_lms[[1]], lmax=lmax, beta=beta)
     samples_2 = distr_2.sample(samples_shape)
     angles_2 = cartesian_to_spherical(to_numpy(samples_2))  # [S, 1, 2]
     mean_angles_2 = np.mean(angles_2, axis=0)  # [1, 2]
@@ -87,9 +87,9 @@ def test_so3distr_sample():
 
 def test_so3distr_prob():
     lmax = 3
-    gamma = 25
+    beta = 25
     a_lms = torch.randn(size=torch.Size((5, (lmax + 1)**2)))
-    distr = SO3Distribution(a_lms=a_lms, lmax=lmax, gamma=gamma)
+    distr = SO3Distribution(a_lms=a_lms, lmax=lmax, beta=beta)
     samples = torch.tensor([
         [1.0, 0.0, 0.0],
         [0.0, 1.0, 0.0],
@@ -101,18 +101,18 @@ def test_so3distr_prob():
 
 def test_so3distr_max_sample():
     lmax = 3
-    gamma = 25
+    beta = 25
     a_lms = torch.randn(size=torch.Size((5, (lmax + 1)**2)))
-    distr = SO3Distribution(a_lms=a_lms, lmax=lmax, gamma=gamma)
+    distr = SO3Distribution(a_lms=a_lms, lmax=lmax, beta=beta)
     samples = distr.argmax(count=17)
     assert samples.shape == (5, 3)
 
 
 def test_so3distr_normalization():
     lmax = 3
-    gamma = 25
+    beta = 25
     a_lms = torch.randn(size=torch.Size((5, (lmax + 1)**2)))
-    distr = SO3Distribution(a_lms=a_lms, lmax=lmax, gamma=gamma)
+    distr = SO3Distribution(a_lms=a_lms, lmax=lmax, beta=beta)
     grid = generate_fibonacci_grid(n=1024)
     grid_t = torch.tensor(grid, dtype=torch.float).unsqueeze(1)
     probs = torch.exp(distr.log_prob(grid_t))
