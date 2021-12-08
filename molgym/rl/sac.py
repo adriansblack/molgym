@@ -12,7 +12,6 @@ def compute_loss_q(
     ac: SACAgent,
     ac_target: SACTarget,
     batch: Dict,
-    gamma: float,
     alpha: float,
     cutoff: float,  # Angstrom
     device: torch.device,
@@ -29,7 +28,7 @@ def compute_loss_q(
         q1_target = ac_target.q1(s_next_next)  # [B, ]
         q2_target = ac_target.q2(s_next_next)  # [B, ]
         q_target = torch.minimum(q1_target, q2_target)
-        backup = batch['reward'] + gamma * (1 - batch['done']) * (q_target - alpha * response['logp'])
+        backup = batch['reward'] + (1 - batch['done']) * (q_target - alpha * response['logp'])
 
     # MSE loss against Bellman backup
     q1 = ac.q1(batch['next_state'])
@@ -71,7 +70,6 @@ def train(
     q_optimizer: Optimizer,
     pi_optimizer: Optimizer,
     data_loader: data.DataLoader,
-    gamma: float,
     alpha: float,
     polyak: float,
     cutoff: float,  # Angstrom
@@ -88,7 +86,7 @@ def train(
 
         # First run one gradient descent step for Q1 and Q2
         q_optimizer.zero_grad()
-        loss_q = compute_loss_q(ac, ac_target, batch, gamma=gamma, alpha=alpha, cutoff=cutoff, device=device)
+        loss_q = compute_loss_q(ac, ac_target, batch, alpha=alpha, cutoff=cutoff, device=device)
         loss_q.backward()
         q_optimizer.step()
         batch_info['loss_q'] = loss_q.detach()

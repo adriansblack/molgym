@@ -62,6 +62,5 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
                         help='interpolation factor in polyak averaging for target networks',
                         type=float,
                         default=0.995)
-    parser.add_argument('--gamma', help='discount factor', type=float, default=1.0)
 
     return parser

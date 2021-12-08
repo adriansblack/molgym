@@ -116,7 +116,6 @@ def main() -> None:
             q_optimizer=q_optimizer,
             pi_optimizer=pi_optimizer,
             data_loader=data_loader,
-            gamma=args.gamma,
             alpha=args.alpha,
             polyak=args.polyak,
             cutoff=args.d_max,
