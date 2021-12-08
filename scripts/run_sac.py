@@ -153,10 +153,10 @@ def main() -> None:
                 training=False,
                 device=device,
             )
-            tau_info: Dict[str, Any] = data.analyze_trajectories(eval_trajectories)
-            tau_info['iteration'] = i
-            tau_info['kind'] = 'eval_rollout'
-            logger.log(tau_info)
+            tau_eval: Dict[str, Any] = data.analyze_trajectories(eval_trajectories)
+            tau_eval['iteration'] = i
+            tau_eval['kind'] = 'eval_rollout'
+            logger.log(tau_eval)
 
 
 if __name__ == '__main__':
