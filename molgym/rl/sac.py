@@ -1,4 +1,5 @@
-from typing import Dict
+import time
+from typing import Dict, List, Any
 
 import torch
 from torch.optim import Optimizer
@@ -50,7 +51,7 @@ def compute_surrogate_loss_policy(
 ) -> torch.Tensor:
     response, _aux = ac.policy(batch['state'])
     actions = tools.detach_tensor_dict(response['action'])  # don't take gradient through samples
-    s_next = data.propagate_batch(batch['next_state'], actions, cutoff=cutoff)
+    s_next = data.propagate_batch(batch['state'], actions, cutoff=cutoff)
     s_next.to(device)
 
     q1 = ac.q1(s_next)  # [B, ]
@@ -75,10 +76,14 @@ def train(
     polyak: float,
     cutoff: float,  # Angstrom
     device: torch.device,
-) -> None:
+) -> Dict[str, Any]:
     """Updates the actor-critic."""
 
+    start_time = time.time()
+    infos: List[tools.TensorDict] = []
+
     for batch in data_loader:
+        batch_info = {}
         batch = tools.dict_to_device(batch, device)
 
         # First run one gradient descent step for Q1 and Q2
@@ -86,6 +91,7 @@ def train(
         loss_q = compute_loss_q(ac, ac_target, batch, gamma=gamma, alpha=alpha, cutoff=cutoff, device=device)
         loss_q.backward()
         q_optimizer.step()
+        batch_info['loss_q'] = loss_q.detach()
 
         # Freeze Q-network(s), so you don't waste computational effort
         # computing gradients for them during the policy learning step.
@@ -96,14 +102,29 @@ def train(
         loss_pi = compute_surrogate_loss_policy(ac, batch, alpha=alpha, cutoff=cutoff, device=device)
         loss_pi.backward()
         pi_optimizer.step()
+        batch_info['loss_pi'] = loss_pi.detach()
 
         # Unfreeze Q-network(s), so you can optimize it at next step.
         ac.unfreeze_q()
 
+        batch_info['loss'] = (loss_q + loss_pi).detach()
+
         # Finally, update target networks by Polyak averaging.
         with torch.no_grad():
-            for p, p_target in zip(ac.parameters(), ac_target.parameters()):
-                # NB: We use an in-place operations "mul_", "add_" to update target
-                # params, as opposed to "mul" and "add", which would make new tensors.
+            # NB: We use an in-place operations "mul_", "add_" to update target
+            # params, as opposed to "mul" and "add", which would make new tensors.
+            for p, p_target in zip(ac.q1.parameters(), ac_target.q1.parameters()):
                 p_target.data.mul_(polyak)
                 p_target.data.add_((1 - polyak) * p.data)
+
+            for p, p_target in zip(ac.q2.parameters(), ac_target.q2.parameters()):
+                p_target.data.mul_(polyak)
+                p_target.data.add_((1 - polyak) * p.data)
+
+        infos.append(batch_info)
+
+    merged_info = tools.stack_tensor_dicts(infos)
+    means = tools.apply_to_dict(merged_info, torch.mean, axis=0)
+    info = tools.apply_to_dict(means, tools.to_numpy)
+    info['time'] = time.time() - start_time
+    return info

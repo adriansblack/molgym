@@ -141,7 +141,7 @@ def process_sars(
         'state': geometrize_state(sars.state, cutoff=cutoff),
         'action': tensorize_action(sars.action),
         'reward': torch.tensor(sars.reward, dtype=torch.get_default_dtype()),
-        'done': torch.tensor(sars.done, dtype=torch.bool),
+        'done': torch.tensor(sars.done, dtype=torch.int),
         'next_state': geometrize_state(sars.next_state, cutoff=cutoff),
     }
 

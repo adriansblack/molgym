@@ -1,6 +1,6 @@
 import collections
 import logging
-from typing import Dict, Sequence
+from typing import Dict, Sequence, List, Callable, Any
 
 import numpy as np
 import torch
@@ -51,11 +51,24 @@ def dict_to_device(o: collections.Mapping, device: torch.device) -> Dict:
     return d
 
 
-def concat_tensor_dicts(tds: Sequence[TensorDict]) -> TensorDict:
+def concat_tensor_dicts(tds: Sequence[TensorDict], dim=0) -> TensorDict:
     if len(tds) == 0:
         return {}
 
-    return {k: torch.cat([td[k] for td in tds], dim=0) for k in tds[0].keys()}
+    assert all(d.keys() == tds[0].keys() for d in tds)
+    return {k: torch.cat([td[k] for td in tds], dim=dim) for k in tds[0].keys()}
+
+
+def stack_tensor_dicts(tds: List[TensorDict], dim=0) -> TensorDict:
+    if len(tds) == 0:
+        return {}
+
+    assert all(td.keys() == tds[0].keys() for td in tds)
+    return {k: torch.stack([td[k] for td in tds], dim=dim) for k in tds[0].keys()}
+
+
+def apply_to_dict(td: TensorDict, f: Callable, *args, **kwargs) -> Dict[str, Any]:
+    return {k: f(v, *args, **kwargs) for k, v in td.items()}
 
 
 def set_seeds(seed: int) -> None:

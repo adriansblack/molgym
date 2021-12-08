@@ -82,9 +82,10 @@ def main() -> None:
     envs = rl.EnvironmentCollection(
         [rl.DiscreteMolecularEnvironment(reward_fn, initial_state, z_table) for _ in range(3)])
 
-    num_iterations = 3
+    num_iterations = 5
     trajectories: List[data.Trajectory] = []
     for _ in range(num_iterations):
+        # Collect data
         new_trajectories = rl.rollout(
             agent=agent,
             envs=envs,
@@ -96,15 +97,19 @@ def main() -> None:
             device=device,
         )
 
+        # Update buffer
         trajectories += new_trajectories
 
+        # Prepare data
+        dataset = [data.process_sars(sars=sars, cutoff=args.d_max) for tau in trajectories for sars in tau]
         data_loader = data.DataLoader(
-            dataset=[data.process_sars(sars=sars, cutoff=args.d_max) for tau in trajectories for sars in tau],
-            batch_size=args.batch_size,
+            dataset=dataset,
+            batch_size=min(args.batch_size, len(dataset)),
             shuffle=True,
             drop_last=True,
         )
 
+        # Train
         rl.train_sac(
             ac=agent,
             ac_target=target,
@@ -117,8 +122,6 @@ def main() -> None:
             cutoff=args.d_max,
             device=device,
         )
-
-    print(trajectories)
 
 
 if __name__ == '__main__':
