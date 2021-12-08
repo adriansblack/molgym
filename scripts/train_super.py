@@ -167,7 +167,7 @@ def main() -> None:
     )
     lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=args.lr_scheduler_gamma)
     checkpoint_handler = tools.CheckpointHandler(directory=args.checkpoints_dir, tag=tag, keep=args.keep_checkpoints)
-    logger = tools.ProgressLogger(directory=args.log_dir, tag=tag + '_train')
+    logger = tools.MetricsLogger(directory=args.log_dir, tag=tag + '_train')
 
     start_epoch = 0
     if args.restart_latest:
