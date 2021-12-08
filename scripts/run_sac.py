@@ -54,23 +54,8 @@ def main() -> None:
     logging.info(f'Number of parameters: {sum(tools.count_parameters(m) for m in [agent, target])}')
 
     # Optimizers
-    pi_optimizer = torch.optim.AdamW(
-        params=[{
-            'name': 'policy',
-            'params': agent.policy.parameters(),
-        }],
-        lr=args.lr,
-        weight_decay=args.weight_decay,
-        amsgrad=True,
-    )
-    q_optimizer = torch.optim.AdamW(
-        params=[{
-            'name': 'q1',
-            'params': agent.q1.parameters(),
-        }, {
-            'name': 'q2',
-            'params': agent.q2.parameters(),
-        }],
+    optimizer = torch.optim.AdamW(
+        params=agent.parameters(),
         lr=args.lr,
         weight_decay=args.weight_decay,
         amsgrad=True,
@@ -81,11 +66,10 @@ def main() -> None:
     initial_state = data.get_state_from_atoms(ase.Atoms('H2O'), index=0, z_table=z_table)
     logging.info('Initial state: ' + str(initial_state))
     envs = rl.EnvironmentCollection(
-        [rl.DiscreteMolecularEnvironment(reward_fn, initial_state, z_table) for _ in range(3)])
+        [rl.DiscreteMolecularEnvironment(reward_fn, initial_state, z_table) for _ in range(args.num_envs)])
 
-    num_iterations = 5
     trajectories: List[data.Trajectory] = []
-    for i in range(num_iterations):
+    for i in range(args.num_iters):
         # Collect data
         logging.debug('Rollout')
         new_trajectories = rl.rollout(
@@ -124,8 +108,7 @@ def main() -> None:
         info = rl.train_sac(
             ac=agent,
             ac_target=target,
-            q_optimizer=q_optimizer,
-            pi_optimizer=pi_optimizer,
+            optimizer=optimizer,
             data_loader=data_loader,
             alpha=args.alpha,
             polyak=args.polyak,

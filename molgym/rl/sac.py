@@ -67,8 +67,7 @@ def compute_surrogate_loss_policy(
 def train_epoch(
     ac: SACAgent,
     ac_target: SACTarget,
-    q_optimizer: Optimizer,
-    pi_optimizer: Optimizer,
+    optimizer: Optimizer,
     data_loader: data.DataLoader,
     alpha: float,
     polyak: float,
@@ -83,28 +82,28 @@ def train_epoch(
         batch_info = {}
         batch = tools.dict_to_device(batch, device)
 
+        optimizer.zero_grad()
+
         # First run one gradient descent step for Q1 and Q2
-        q_optimizer.zero_grad()
         loss_q = compute_loss_q(ac, ac_target, batch, alpha=alpha, cutoff=cutoff, device=device)
-        loss_q.backward()
-        q_optimizer.step()
-        batch_info['loss_q'] = loss_q.detach()
 
         # Freeze Q-network(s), so you don't waste computational effort
         # computing gradients for them during the policy learning step.
         ac.freeze_q()
 
         # Next run one gradient descent step for pi.
-        pi_optimizer.zero_grad()
         loss_pi = compute_surrogate_loss_policy(ac, batch, alpha=alpha, cutoff=cutoff, device=device)
-        loss_pi.backward()
-        pi_optimizer.step()
-        batch_info['loss_pi'] = loss_pi.detach()
 
         # Unfreeze Q-network(s), so you can optimize it at next step.
         ac.unfreeze_q()
 
-        batch_info['loss'] = (loss_q + loss_pi).detach()
+        loss = loss_pi + loss_q
+        loss.backward()
+        optimizer.step()
+
+        batch_info['loss_pi'] = loss_pi.detach()
+        batch_info['loss_q'] = loss_q.detach()
+        batch_info['loss'] = loss.detach()
 
         # Finally, update target networks by Polyak averaging.
         with torch.no_grad():
@@ -129,8 +128,7 @@ def train_epoch(
 def train(
     ac: SACAgent,
     ac_target: SACTarget,
-    q_optimizer: Optimizer,
-    pi_optimizer: Optimizer,
+    optimizer: Optimizer,
     data_loader: data.DataLoader,
     alpha: float,
     polyak: float,
@@ -144,8 +142,7 @@ def train(
         metrics = train_epoch(
             ac=ac,
             ac_target=ac_target,
-            q_optimizer=q_optimizer,
-            pi_optimizer=pi_optimizer,
+            optimizer=optimizer,
             data_loader=data_loader,
             alpha=alpha,
             polyak=polyak,
