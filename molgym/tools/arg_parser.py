@@ -40,8 +40,8 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument('--lr', help='learning rate of optimizer', type=float, default=0.001)
     parser.add_argument('--lr_scheduler_gamma', help='gamma of learning rate scheduler', type=float, default=0.9993)
     parser.add_argument('--weight_decay', help='weight decay (L2 penalty)', type=float, default=5e-5)
-    parser.add_argument('--max_num_epochs', help='maximum number of epochs', type=int, default=128)
-    parser.add_argument('--eval_interval', help='evaluate model every <n> epochs', type=int, default=2)
+    parser.add_argument('--num_epochs', help='number of epochs', type=int, default=10)
+    parser.add_argument('--eval_interval', help='evaluate model every <n> epochs', type=int, default=5)
     parser.add_argument('--keep_checkpoints', help='keep all checkpoints', action='store_true', default=False)
     parser.add_argument('--restart_latest',
                         help='restart optimizer from latest checkpoint',

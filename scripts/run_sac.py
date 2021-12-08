@@ -1,6 +1,6 @@
 import argparse
 import logging
-from typing import List
+from typing import List, Any, Dict
 
 import ase
 import torch
@@ -26,6 +26,7 @@ def main() -> None:
     logging.info(f'Configuration: {args}')
     device = tools.init_device(args.device)
     tools.set_default_dtype(args.default_dtype)
+    logger = tools.MetricsLogger(directory=args.log_dir, tag=tag)
 
     # Create Z table
     z_table = data.AtomicNumberTable(tools.parse_zs(args.zs))
@@ -84,8 +85,9 @@ def main() -> None:
 
     num_iterations = 5
     trajectories: List[data.Trajectory] = []
-    for _ in range(num_iterations):
+    for i in range(num_iterations):
         # Collect data
+        logging.debug('Rollout')
         new_trajectories = rl.rollout(
             agent=agent,
             envs=envs,
@@ -97,10 +99,18 @@ def main() -> None:
             device=device,
         )
 
-        # Update buffer
+        # Analyzing trajectories
+        logging.debug('Analyzing trajectories')
+        tau_info: Dict[str, Any] = data.analyze_trajectories(new_trajectories)
+        tau_info['iteration'] = i
+        tau_info['kind'] = 'rollout'
+        logger.log(tau_info)
+
+        # Updating buffer
         trajectories += new_trajectories
 
         # Prepare data
+        logging.debug('Preparing data')
         dataset = [data.process_sars(sars=sars, cutoff=args.d_max) for tau in trajectories for sars in tau]
         data_loader = data.DataLoader(
             dataset=dataset,
@@ -110,7 +120,8 @@ def main() -> None:
         )
 
         # Train
-        rl.train_sac(
+        logging.debug('Training')
+        info = rl.train_sac(
             ac=agent,
             ac_target=target,
             q_optimizer=q_optimizer,
@@ -120,7 +131,32 @@ def main() -> None:
             polyak=args.polyak,
             cutoff=args.d_max,
             device=device,
+            num_epochs=args.num_epochs,
         )
+        train_info = {
+            'progress': info,
+            'kind': 'train',
+            'iteration': i,
+        }
+        logger.log(train_info)
+
+        # Evaluate
+        if i % args.eval_interval == 0:
+            logging.debug('Rollout')
+            eval_trajectories = rl.rollout(
+                agent=agent,
+                envs=envs,
+                num_steps=None,
+                num_episodes=1,
+                d_max=args.d_max,
+                batch_size=args.batch_size,
+                training=False,
+                device=device,
+            )
+            tau_info: Dict[str, Any] = data.analyze_trajectories(eval_trajectories)
+            tau_info['iteration'] = i
+            tau_info['kind'] = 'eval_rollout'
+            logger.log(tau_info)
 
 
 if __name__ == '__main__':

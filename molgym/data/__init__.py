@@ -3,7 +3,8 @@ from .geometric_data import (DataLoader, StateData, StateBatch, CanvasData, Canv
 from .graph_tools import get_neighborhood
 from .trajectory import (State, Bag, bag_is_empty, no_real_atoms_in_bag, generate_sparse_reward_trajectory, SARS,
                          Trajectory, propagate, state_to_atoms, Action, FOCUS_KEY, ELEMENT_KEY, DISTANCE_KEY,
-                         ORIENTATION_KEY, ELEMENTS_KEY, POSITIONS_KEY, BAG_KEY, get_state_from_atoms)
+                         ORIENTATION_KEY, ELEMENTS_KEY, POSITIONS_KEY, BAG_KEY, get_state_from_atoms,
+                         analyze_trajectories)
 from .utils import Configuration, Configurations, load_xyz, config_from_atoms, AtomicNumberTable
 
 __all__ = [
@@ -12,5 +13,5 @@ __all__ = [
     'bag_is_empty', 'no_real_atoms_in_bag', 'State', 'generate_sparse_reward_trajectory', 'SARS', 'Trajectory',
     'propagate', 'state_to_atoms', 'Action', 'FOCUS_KEY', 'ELEMENT_KEY', 'DISTANCE_KEY', 'ORIENTATION_KEY',
     'ELEMENTS_KEY', 'POSITIONS_KEY', 'BAG_KEY', 'get_state_from_atoms', 'state_from_td', 'actions_from_td',
-    'process_sars', 'collate_fn', 'propagate_batch'
+    'process_sars', 'collate_fn', 'propagate_batch', 'analyze_trajectories'
 ]

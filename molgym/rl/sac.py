@@ -1,4 +1,4 @@
-import time
+import logging
 from typing import Dict, List, Any
 
 import torch
@@ -64,7 +64,7 @@ def compute_surrogate_loss_policy(
     return loss
 
 
-def train(
+def train_epoch(
     ac: SACAgent,
     ac_target: SACTarget,
     q_optimizer: Optimizer,
@@ -77,7 +77,6 @@ def train(
 ) -> Dict[str, Any]:
     """Updates the actor-critic."""
 
-    start_time = time.time()
     infos: List[tools.TensorDict] = []
 
     for batch in data_loader:
@@ -124,5 +123,37 @@ def train(
     merged_info = tools.stack_tensor_dicts(infos)
     means = tools.apply_to_dict(merged_info, torch.mean, axis=0)
     info = tools.apply_to_dict(means, tools.to_numpy)
-    info['time'] = time.time() - start_time
+    return info
+
+
+def train(
+    ac: SACAgent,
+    ac_target: SACTarget,
+    q_optimizer: Optimizer,
+    pi_optimizer: Optimizer,
+    data_loader: data.DataLoader,
+    alpha: float,
+    polyak: float,
+    cutoff: float,  # Angstrom
+    num_epochs: int,
+    device: torch.device,
+) -> List[Dict[str, Any]]:
+    logging.info('Started training')
+    info = []
+    for epoch in range(num_epochs):
+        metrics = train_epoch(
+            ac=ac,
+            ac_target=ac_target,
+            q_optimizer=q_optimizer,
+            pi_optimizer=pi_optimizer,
+            data_loader=data_loader,
+            alpha=alpha,
+            polyak=polyak,
+            cutoff=cutoff,
+            device=device,
+        )
+        metrics['epoch'] = epoch
+        info.append(metrics)
+
+    logging.info('Training complete')
     return info

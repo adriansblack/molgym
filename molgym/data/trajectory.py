@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Iterable, Sequence, List, Optional
+from typing import Iterable, Sequence, List, Optional, Dict, Union
 
 import ase.data
 import numpy as np
@@ -182,3 +182,21 @@ def generate_sparse_reward_trajectory(
         state = next_state
 
     return tau
+
+
+def analyze_trajectory(tau: Trajectory) -> Dict[str, Union[int, float]]:
+    return {
+        'length': len(tau),
+        'return': sum(sars.reward for sars in tau),
+    }
+
+
+def analyze_trajectories(taus: List[Trajectory]) -> Dict[str, float]:
+    dicts = [analyze_trajectory(tau) for tau in taus]
+
+    if len(dicts) == 0:
+        return {}
+
+    keys = dicts[0].keys()
+    assert all(d.keys() == keys for d in dicts)
+    return {key: np.mean([d[key] for d in dicts]) for key in keys}
