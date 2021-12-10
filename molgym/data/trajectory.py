@@ -102,7 +102,7 @@ def state_to_atoms(state: State, z_table: AtomicNumberTable) -> ase.Atoms:
     return ase.Atoms(
         symbols=[ase.data.chemical_symbols[z_table.index_to_z(e)] for e in state.elements],
         positions=state.positions,
-        info={'bag': {ase.data.chemical_symbols[z_table.index_to_z(i)]: v
+        info={'bag': {ase.data.chemical_symbols[z_table.index_to_z(i)]: int(v)
                       for i, v in enumerate(state.bag)}},
     )
 
