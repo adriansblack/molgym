@@ -63,7 +63,7 @@ def main() -> None:
 
     # Set up environment(s)
     reward_fn = rl.SparseInteractionReward()
-    initial_state = data.get_state_from_atoms(ase.Atoms('H2O'), index=0, z_table=z_table)
+    initial_state = data.get_state_from_atoms(ase.Atoms('O2'), index=0, z_table=z_table)
     logging.info('Initial state: ' + str(initial_state))
     envs = rl.EnvironmentCollection(
         [rl.DiscreteMolecularEnvironment(reward_fn, initial_state, z_table) for _ in range(args.num_envs)])
@@ -75,8 +75,8 @@ def main() -> None:
         new_trajectories = rl.rollout(
             agent=agent,
             envs=envs,
-            num_steps=12,
-            num_episodes=None,
+            num_steps=None,
+            num_episodes=args.num_rollouts,
             d_max=args.d_max,
             batch_size=args.batch_size,
             training=True,
@@ -125,7 +125,7 @@ def main() -> None:
 
         # Evaluate
         if i % args.eval_interval == 0:
-            logging.debug('Rollout')
+            logging.debug('Evaluation rollout')
             eval_trajectories = rl.rollout(
                 agent=agent,
                 envs=envs,
@@ -140,6 +140,8 @@ def main() -> None:
             tau_eval['iteration'] = i
             tau_eval['kind'] = 'eval_rollout'
             logger.log(tau_eval)
+
+
 
 
 if __name__ == '__main__':

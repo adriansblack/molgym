@@ -136,7 +136,7 @@ def train(
     num_epochs: int,
     device: torch.device,
 ) -> List[Dict[str, Any]]:
-    logging.info('Started training')
+    logging.debug(f'Started training for {num_epochs} epoch(s)')
     info = []
     for epoch in range(num_epochs):
         metrics = train_epoch(
@@ -152,5 +152,5 @@ def train(
         metrics['epoch'] = epoch
         info.append(metrics)
 
-    logging.info('Training complete')
+    logging.debug('Training complete')
     return info
