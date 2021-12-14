@@ -97,6 +97,7 @@ def main() -> None:
 
         # Update buffer
         trajectories += new_trajectories
+        trajectories = trajectories[-args.num_buffers * args.num_rollouts:]
 
         # Prepare data
         logging.debug('Preparing data')
@@ -109,7 +110,7 @@ def main() -> None:
         )
 
         # Train
-        logging.debug('Training')
+        logging.debug(f'Training on {len(dataset)} item(s)')
         info = rl.train_sac(
             ac=agent,
             ac_target=target,

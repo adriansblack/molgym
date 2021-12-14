@@ -54,6 +54,7 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
 
     # RL
     parser.add_argument('--num_rollouts', help='number of rollouts', type=int, default=16)
+    parser.add_argument('--num_buffers', help='number of rollouts to keep in the buffer', type=int, default=8)
     parser.add_argument('--num_iters', help='maximum number of iterations', type=int, default=100)
     parser.add_argument('--num_envs', help='number of environment copies', type=int, default=4)
     parser.add_argument('--num_paths_per_atom',
