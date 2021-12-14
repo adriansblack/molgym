@@ -14,6 +14,7 @@ from molgym import tools, data, rl
 
 def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument('--zs', help='atomic numbers (e.g.: 1,6,7,8)', type=str, required=True)
+    parser.add_argument('--bag', help='chemical formula of initial state (e.g.: H2O)', type=str, required=True)
     return parser
 
 
@@ -66,7 +67,7 @@ def main() -> None:
 
     # Set up environment(s)
     reward_fn = rl.SparseInteractionReward()
-    initial_state = data.get_state_from_atoms(ase.Atoms('O2'), index=0, z_table=z_table)
+    initial_state = data.get_state_from_atoms(ase.Atoms(args.bag), index=0, z_table=z_table)
     logging.info('Initial state: ' + str(initial_state))
     envs = rl.EnvironmentCollection(
         [rl.DiscreteMolecularEnvironment(reward_fn, initial_state, z_table) for _ in range(args.num_envs)])
