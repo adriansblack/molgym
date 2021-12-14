@@ -1,8 +1,11 @@
 import argparse
 import logging
+import os
 from typing import List, Any, Dict
 
 import ase
+import ase.io
+import numpy as np
 import torch
 from e3nn import o3
 
@@ -68,6 +71,7 @@ def main() -> None:
     envs = rl.EnvironmentCollection(
         [rl.DiscreteMolecularEnvironment(reward_fn, initial_state, z_table) for _ in range(args.num_envs)])
 
+    highest_return = -np.inf
     trajectories: List[data.Trajectory] = []
     for i in range(args.num_iters):
         # Collect data
@@ -83,14 +87,14 @@ def main() -> None:
             device=device,
         )
 
-        # Analyzing trajectories
+        # Analyze trajectories
         logging.debug('Analyzing trajectories')
         tau_info: Dict[str, Any] = data.analyze_trajectories(new_trajectories)
         tau_info['iteration'] = i
         tau_info['kind'] = 'rollout'
         logger.log(tau_info)
 
-        # Updating buffer
+        # Update buffer
         trajectories += new_trajectories
 
         # Prepare data
@@ -140,8 +144,15 @@ def main() -> None:
             tau_eval['iteration'] = i
             tau_eval['kind'] = 'eval_rollout'
             logger.log(tau_eval)
+            logging.info(f'Evaluation return: {tau_eval["return"]:.3f}')
 
+            terminal_atoms = [data.state_to_atoms(tau[-1].next_state, z_table) for tau in eval_trajectories]
+            ase.io.write(os.path.join(args.log_dir, f'terminals_{i}.xyz'), images=terminal_atoms, format='extxyz')
 
+            if tau_eval['return'] > highest_return:
+                highest_return = tau_eval['return']
+                os.makedirs(name=args.checkpoint_dir, exist_ok=True)
+                torch.save(agent, os.path.join(args.checkpoint_dir, f'agent_{i}.model'))
 
 
 if __name__ == '__main__':

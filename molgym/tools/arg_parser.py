@@ -2,7 +2,7 @@ import argparse
 
 
 def build_default_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description='Command line tool of MolGen3D')
+    parser = argparse.ArgumentParser(description='Command line arguments for MolGym3')
 
     # Name and seed
     parser.add_argument('--name', help='experiment name', required=True)
@@ -10,7 +10,7 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
 
     # Directories
     parser.add_argument('--log_dir', help='directory for log files', type=str, default='logs')
-    parser.add_argument('--checkpoints_dir', help='directory for checkpoint files', type=str, default='checkpoints')
+    parser.add_argument('--checkpoint_dir', help='directory for checkpoint files', type=str, default='checkpoints')
 
     # Device and logging
     parser.add_argument('--device', help='select device', type=str, choices=['cpu', 'cuda'], default='cpu')
