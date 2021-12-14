@@ -92,7 +92,7 @@ def main() -> None:
         logging.debug('Analyzing trajectories')
         tau_info: Dict[str, Any] = data.analyze_trajectories(new_trajectories)
         tau_info['iteration'] = i
-        tau_info['kind'] = 'rollout'
+        tau_info['kind'] = 'train_rollout'
         logger.log(tau_info)
 
         # Update buffer
@@ -153,7 +153,8 @@ def main() -> None:
             if tau_eval['return'] > highest_return:
                 highest_return = tau_eval['return']
                 os.makedirs(name=args.checkpoint_dir, exist_ok=True)
-                torch.save(agent, os.path.join(args.checkpoint_dir, f'agent_{i}.model'))
+                agent_cpu = agent.to(torch.device('cpu'))
+                torch.save(agent_cpu, os.path.join(args.checkpoint_dir, f'agent_{i}.model'))
 
 
 if __name__ == '__main__':
