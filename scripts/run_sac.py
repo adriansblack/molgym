@@ -76,7 +76,7 @@ def main() -> None:
     trajectories: List[data.Trajectory] = []
     for i in range(args.num_iters):
         # Collect data
-        logging.debug('Rollout')
+        logging.debug(f'Rollout with {args.num_rollouts} episodes')
         new_trajectories = rl.rollout(
             agent=agent,
             envs=envs,
@@ -100,7 +100,7 @@ def main() -> None:
         trajectories = trajectories[-args.num_buffers * args.num_rollouts:]
 
         # Prepare data
-        logging.debug('Preparing data')
+        logging.debug(f'Preparing {len(trajectories)} trajectories')
         dataset = [data.process_sars(sars=sars, cutoff=args.d_max) for tau in trajectories for sars in tau]
         data_loader = data.DataLoader(
             dataset=dataset,
@@ -110,7 +110,6 @@ def main() -> None:
         )
 
         # Train
-        logging.debug(f'Training on {len(dataset)} item(s)')
         info = rl.train_sac(
             ac=agent,
             ac_target=target,
