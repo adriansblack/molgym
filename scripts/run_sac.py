@@ -95,7 +95,7 @@ def main() -> None:
         logging.debug('Analyzing trajectories')
         tau_info: Dict[str, Any] = data.analyze_trajectories(new_trajectories)
         tau_info['iteration'] = i
-        tau_info['kind'] = 'train_rollout'
+        tau_info['kind'] = 'train'
         logger.log(tau_info)
 
         # Update buffer
@@ -126,7 +126,7 @@ def main() -> None:
         )
         train_info = {
             'progress': info,
-            'kind': 'train',
+            'kind': 'opt',
             'iteration': i,
         }
         logger.log(train_info)
@@ -146,7 +146,7 @@ def main() -> None:
             )
             tau_eval: Dict[str, Any] = data.analyze_trajectories(eval_trajectories)
             tau_eval['iteration'] = i
-            tau_eval['kind'] = 'eval_rollout'
+            tau_eval['kind'] = 'eval'
             logger.log(tau_eval)
             logging.info(f'Evaluation return: {tau_eval["return"]:.3f}')
 
@@ -159,8 +159,7 @@ def main() -> None:
 
     logging.info('Saving model')
     os.makedirs(name=args.checkpoint_dir, exist_ok=True)
-    agent.to(torch.device('cpu'))
-    torch.save(agent, os.path.join(args.checkpoint_dir, f'agent.model'))
+    torch.save(agent.cpu(), os.path.join(args.checkpoint_dir, f'agent.model'))
 
     logging.info('Done')
 
