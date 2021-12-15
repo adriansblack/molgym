@@ -72,6 +72,9 @@ def main() -> None:
     envs = rl.EnvironmentCollection(
         [rl.DiscreteMolecularEnvironment(reward_fn, initial_state, z_table) for _ in range(args.num_envs)])
 
+    # Checkpointing
+    handler = tools.CheckpointHandler(directory=args.checkpoint_dir, tag=tag, keep=True)
+
     highest_return = -np.inf
     trajectories: List[data.Trajectory] = []
     for i in range(args.num_iters):
@@ -152,9 +155,14 @@ def main() -> None:
 
             if tau_eval['return'] > highest_return:
                 highest_return = tau_eval['return']
-                os.makedirs(name=args.checkpoint_dir, exist_ok=True)
-                agent_cpu = agent.to(torch.device('cpu'))
-                torch.save(agent_cpu, os.path.join(args.checkpoint_dir, f'agent_{i}.model'))
+                handler.save(tools.CheckpointState(agent, optimizer), counter=i)
+
+    logging.info('Saving model')
+    os.makedirs(name=args.checkpoint_dir, exist_ok=True)
+    agent.to(torch.device('cpu'))
+    torch.save(agent, os.path.join(args.checkpoint_dir, f'agent.model'))
+
+    logging.info('Done')
 
 
 if __name__ == '__main__':

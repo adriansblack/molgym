@@ -55,7 +55,7 @@ def train(
             else:
                 lowest_loss = valid_loss
                 patience_counter = 0
-                checkpoint_handler.save(state=CheckpointState(model, optimizer, lr_scheduler), epochs=epoch)
+                checkpoint_handler.save(state=CheckpointState(model, optimizer, lr_scheduler), counter=epoch)
 
         # LR scheduler
         lr_scheduler.step()

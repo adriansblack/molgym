@@ -26,7 +26,7 @@ def test_save_load():
 
     with tempfile.TemporaryDirectory() as directory:
         handler = CheckpointHandler(directory=directory, tag='test', keep=True)
-        handler.save(state=CheckpointState(model, optimizer, lr_scheduler), epochs=50)
+        handler.save(state=CheckpointState(model, optimizer, lr_scheduler), counter=50)
 
         optimizer.step()
         lr_scheduler.step()

@@ -15,23 +15,27 @@ Checkpoint = Dict[str, TensorDict]
 class CheckpointState:
     model: torch.nn.Module
     optimizer: torch.optim.Optimizer
-    lr_scheduler: torch.optim.lr_scheduler.ExponentialLR
+    lr_scheduler: Optional[torch.optim.lr_scheduler.ExponentialLR] = None
 
 
 class CheckpointBuilder:
     @staticmethod
     def create_checkpoint(state: CheckpointState) -> Checkpoint:
-        return {
+        d = {
             'model': state.model.state_dict(),
             'optimizer': state.optimizer.state_dict(),
-            'lr_scheduler': state.lr_scheduler.state_dict(),
         }
+        if state.lr_scheduler is not None:
+            d['lr_scheduler'] = state.lr_scheduler.state_dict()
+
+        return d
 
     @staticmethod
     def load_checkpoint(state: CheckpointState, checkpoint: Checkpoint, strict: bool) -> None:
         state.model.load_state_dict(checkpoint['model'], strict=strict)  # type: ignore
         state.optimizer.load_state_dict(checkpoint['optimizer'])
-        state.lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
+        if state.lr_scheduler is not None:
+            state.lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
 
 
 @dataclasses.dataclass
@@ -48,11 +52,11 @@ class CheckpointIO:
         self.keep = keep
         self.old_path: Optional[str] = None
 
-        self._epochs_string = '_epoch-'
+        self._counter_string = '_'
         self._filename_extension = 'pt'
 
-    def _get_checkpoint_filename(self, epochs: int) -> str:
-        return self.tag + self._epochs_string + str(epochs) + '.' + self._filename_extension
+    def _get_checkpoint_filename(self, counter: int) -> str:
+        return self.tag + self._counter_string + str(counter) + '.' + self._filename_extension
 
     def _list_file_paths(self) -> List[str]:
         all_paths = [os.path.join(self.directory, f) for f in os.listdir(self.directory)]
@@ -60,7 +64,7 @@ class CheckpointIO:
 
     def _parse_checkpoint_path(self, path: str) -> Optional[CheckpointPathInfo]:
         filename = os.path.basename(path)
-        regex = re.compile(rf'^(?P<tag>.+){self._epochs_string}(?P<epochs>\d+)\.{self._filename_extension}$')
+        regex = re.compile(rf'^(?P<tag>.+){self._counter_string}(?P<iter>\d+)\.{self._filename_extension}$')
         match = regex.match(filename)
         if not match:
             return None
@@ -68,7 +72,7 @@ class CheckpointIO:
         return CheckpointPathInfo(
             path=path,
             tag=match.group('tag'),
-            epochs=int(match.group('epochs')),
+            epochs=int(match.group('iter')),
         )
 
     def _get_latest_checkpoint_path(self) -> str:
@@ -112,14 +116,14 @@ class CheckpointHandler:
         self.io = CheckpointIO(*args, **kwargs)
         self.builder = CheckpointBuilder()
 
-    def save(self, state: CheckpointState, epochs: int) -> None:
+    def save(self, state: CheckpointState, counter: int) -> None:
         checkpoint = self.builder.create_checkpoint(state)
-        self.io.save(checkpoint, epochs)
+        self.io.save(checkpoint, counter)
 
     def load_latest(self, state: CheckpointState, device: Optional[torch.device] = None, strict=False) -> int:
-        checkpoint, epochs = self.io.load_latest(device=device)
+        checkpoint, counter = self.io.load_latest(device=device)
         self.builder.load_checkpoint(state=state, checkpoint=checkpoint, strict=strict)
-        return epochs
+        return counter
 
     def load(self, state: CheckpointState, path: str, strict=False, device: Optional[torch.device] = None) -> int:
         checkpoint, epochs = self.io.load(path, device=device)
