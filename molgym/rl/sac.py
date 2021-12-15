@@ -101,9 +101,9 @@ def train_epoch(
         loss.backward()
         optimizer.step()
 
-        batch_info['loss_pi'] = loss_pi.detach()
-        batch_info['loss_q'] = loss_q.detach()
-        batch_info['loss'] = loss.detach()
+        batch_info['loss_pi'] = loss_pi.detach().cpu()
+        batch_info['loss_q'] = loss_q.detach().cpu()
+        batch_info['loss'] = loss.detach().cpu()
 
         # Finally, update target networks by Polyak averaging.
         with torch.no_grad():
@@ -136,7 +136,7 @@ def train(
     num_epochs: int,
     device: torch.device,
 ) -> List[Dict[str, Any]]:
-    logging.debug(f'Started training for {num_epochs} epoch(s)')
+    logging.debug(f'Training for {num_epochs} epoch(s)')
     info = []
     for epoch in range(num_epochs):
         metrics = train_epoch(
