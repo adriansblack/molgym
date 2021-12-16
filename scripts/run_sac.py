@@ -156,7 +156,7 @@ def main() -> None:
                 data.state_to_atoms(tau[-1].next_state, z_table, info={'reward': tau[-1].reward})
                 for tau in eval_trajectories
             ]
-            ase.io.write(os.path.join(args.log_dir, f'terminals_{i}.xyz'), images=terminal_atoms, format='extxyz')
+            ase.io.write(os.path.join(args.log_dir, f'terminals_{tag}_{i}.xyz'), images=terminal_atoms, format='extxyz')
 
             if tau_eval['return'] > highest_return:
                 highest_return = tau_eval['return']
@@ -164,7 +164,7 @@ def main() -> None:
 
     logging.info('Saving model')
     os.makedirs(name=args.checkpoint_dir, exist_ok=True)
-    torch.save(agent.cpu(), os.path.join(args.checkpoint_dir, f'agent.model'))
+    torch.save(agent.cpu(), os.path.join(args.checkpoint_dir, f'agent_{tag}.model'))
 
     logging.info('Done')
 
