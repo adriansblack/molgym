@@ -239,6 +239,8 @@ def main():
     for batch in data_loader:
         batch = tools.dict_to_device(batch, device)
         output, aux = model(batch['state'], batch['action'])
+        action = output['action']
+        distrs = aux['distrs']
 
         # Visualize
         fig = plotly.subplots.make_subplots(
@@ -257,20 +259,20 @@ def main():
         )
         fig.update_layout(width=1200, height=1000, showlegend=False)
 
-        plot_focus_distribution(fig, row=1, col=1, distr=aux['distrs'][0], focus=output['focus'][0])
+        plot_focus_distribution(fig, row=1, col=1, distr=distrs[0], focus=action['focus'][0])
         plot_element_distribution(fig,
                                   row=1,
                                   col=2,
-                                  distr=aux['distrs'][1],
+                                  distr=distrs[1],
                                   labels=symbols,
-                                  element=output['element'][0])
+                                  element=action['element'][0])
         plot_distance_distribution(fig,
                                    row=2,
                                    col=1,
                                    distance_range=(float(args.d_min), float(args.d_max)),
-                                   distr=aux['distrs'][2],
-                                   distance=output['distance'][0])
-        plot_orientation_distribution(fig, row=2, col=2, distr=aux['distrs'][3], orientation=output['orientation'][0])
+                                   distr=distrs[2],
+                                   distance=action['distance'][0])
+        plot_orientation_distribution(fig, row=2, col=2, distr=distrs[3], orientation=action['orientation'][0])
 
         fig.show()
 
