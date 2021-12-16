@@ -1,7 +1,7 @@
 import argparse
 import logging
 import os
-from typing import List, Any, Dict
+from typing import Any, Dict
 
 import ase
 import ase.io
@@ -76,15 +76,17 @@ def main() -> None:
     handler = tools.CheckpointHandler(directory=args.checkpoint_dir, tag=tag, keep=True)
 
     highest_return = -np.inf
-    trajectories: List[data.Trajectory] = []
+    dataset = []
+    trajectory_lengths = []
     for i in range(args.num_iters):
         # Collect data
-        logging.debug(f'Rollout with {args.num_rollouts} episodes')
+        num_episodes = args.num_episodes_per_iter if i > 0 else args.num_initial_episodes
+        logging.debug(f'Rollout with {num_episodes} episodes')
         new_trajectories = rl.rollout(
             agent=agent,
             envs=envs,
             num_steps=None,
-            num_episodes=args.num_rollouts,
+            num_episodes=num_episodes,
             d_max=args.d_max,
             batch_size=args.batch_size,
             training=True,
@@ -99,12 +101,12 @@ def main() -> None:
         logger.log(tau_info)
 
         # Update buffer
-        trajectories += new_trajectories
-        trajectories = trajectories[-args.num_buffers * args.num_rollouts:]
+        trajectory_lengths += [len(tau) for tau in new_trajectories]
+        trajectory_lengths = trajectory_lengths[-args.max_num_episodes:]
+        dataset += [data.process_sars(sars=sars, cutoff=args.d_max) for tau in new_trajectories for sars in tau]
+        dataset = dataset[-sum(trajectory_lengths):]
 
-        # Prepare data
-        logging.debug(f'Preparing {len(trajectories)} trajectories')
-        dataset = [data.process_sars(sars=sars, cutoff=args.d_max) for tau in trajectories for sars in tau]
+        logging.debug(f'Preparing dataloader with {len(dataset)} steps')
         data_loader = data.DataLoader(
             dataset=dataset,
             batch_size=min(args.batch_size, len(dataset)),

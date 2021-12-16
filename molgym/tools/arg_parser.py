@@ -53,9 +53,10 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument('--d_max', help='maximum distance (in Ang)', type=float, default=1.8)
 
     # RL
-    parser.add_argument('--num_rollouts', help='number of rollouts', type=int, default=16)
-    parser.add_argument('--num_buffers', help='number of rollouts to keep in the buffer', type=int, default=8)
     parser.add_argument('--num_iters', help='maximum number of iterations', type=int, default=100)
+    parser.add_argument('--num_initial_episodes', help='initial number of episodes', type=int, default=64)
+    parser.add_argument('--num_episodes_per_iter', help='number of episodes per iteration', type=int, default=16)
+    parser.add_argument('--max_num_episodes', help='maximum number of episodes in buffer', type=int, default=1024)
     parser.add_argument('--num_envs', help='number of environment copies', type=int, default=4)
     parser.add_argument('--num_paths_per_atom',
                         help='number of paths per atom in configuration',
