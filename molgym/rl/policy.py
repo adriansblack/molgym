@@ -78,7 +78,7 @@ class Policy(torch.nn.Module):
         min_distance, max_distance = self.min_max_distance
         self.d_center = torch.tensor((min_distance + max_distance) / 2)
         self.d_half_width = torch.tensor((max_distance - min_distance) / 2)
-        self.d_log_stds = torch.nn.Parameter(torch.tensor([np.log(0.1)] * self.num_gaussians), requires_grad=True)
+        self.d_log_stds = torch.nn.Parameter(torch.tensor([np.log(0.2)] * self.num_gaussians), requires_grad=True)
 
         # Orientation
         self.bessel_fn = BesselBasis(r_max=max_distance, num_basis=num_bessel)
