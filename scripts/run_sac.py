@@ -152,7 +152,10 @@ def main() -> None:
             logger.log(tau_eval)
             logging.info(f'Evaluation return: {tau_eval["return"]:.3f}')
 
-            terminal_atoms = [data.state_to_atoms(tau[-1].next_state, z_table) for tau in eval_trajectories]
+            terminal_atoms = [
+                data.state_to_atoms(tau[-1].next_state, z_table, info={'reward': tau[-1].reward})
+                for tau in eval_trajectories
+            ]
             ase.io.write(os.path.join(args.log_dir, f'terminals_{i}.xyz'), images=terminal_atoms, format='extxyz')
 
             if tau_eval['return'] > highest_return:
