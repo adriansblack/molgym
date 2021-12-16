@@ -100,7 +100,7 @@ def main():
     train_df = pd.concat(
         [generate_df(parse_results(path, 'train'), seed=seed) for (name, seed, path) in tuples])
     eval_df = pd.concat([generate_df(parse_results(path, 'eval'), seed=seed) for (name, seed, path) in tuples])
-    opt_df = pd.concat([generate_opt_df(parse_results(path, 'train'), seed=seed) for (name, seed, path) in tuples])
+    opt_df = pd.concat([generate_opt_df(parse_results(path, 'opt'), seed=seed) for (name, seed, path) in tuples])
 
     # Plot
     fig, axes = plt.subplots(ncols=2, nrows=1, figsize=(2 * fig_width, fig_height), constrained_layout=True)
