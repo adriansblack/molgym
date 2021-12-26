@@ -34,8 +34,8 @@ def compute_loss_q(
     q1 = ac.q1(batch['next_state'])
     q2 = ac.q2(batch['next_state'])
 
-    loss_q1 = ((q1 - backup)**2).mean()
-    loss_q2 = ((q2 - backup)**2).mean()
+    loss_q1 = torch.square(q1 - backup).mean()
+    loss_q2 = torch.square(q2 - backup).mean()
     loss = loss_q1 + loss_q2
 
     return loss
@@ -49,8 +49,7 @@ def compute_surrogate_loss_policy(
     device: torch.device,
 ) -> torch.Tensor:
     response, _aux = ac.policy(batch['state'])
-    actions = tools.detach_tensor_dict(response['action'])  # don't take gradient through samples
-    s_next = data.propagate_batch(batch['state'], actions, cutoff=cutoff)
+    s_next = data.propagate_batch(batch['state'], response['action'], cutoff=cutoff)
     s_next.to(device)
 
     q1 = ac.q1(s_next)  # [B, ]
