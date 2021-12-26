@@ -1,10 +1,11 @@
 import argparse
+import collections
 import glob
 import json
 import os
 import re
 import sys
-from typing import List, Optional, Tuple, Dict
+from typing import List, Optional, Tuple, Dict, DefaultDict
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -91,36 +92,48 @@ def plot_optimization(ax: plt.Axes, df: pd.DataFrame, min_iter: int, max_iter: i
         ax.plot(df.index, df[k]['mean'], label=k)
 
 
-def main():
-    args = parse_args()
-    tuples = [(*parse_path(path), path) for path in get_paths(args.path)]
-    print('Parsing paths: ' + str([path for name, counter, path in tuples]))
+def group_by_name(tuples: List[Tuple[str, int, str]]) -> DefaultDict[str, List[Tuple[int, str]]]:
+    d = collections.defaultdict(list)
+    for t in tuples:
+        d[t[0]].append((t[1], t[2]))
+    return d
 
-    # Ignoring names for now
-    train_df = pd.concat(
-        [generate_df(parse_results(path, 'train'), seed=seed) for (name, seed, path) in tuples])
-    eval_df = pd.concat([generate_df(parse_results(path, 'eval'), seed=seed) for (name, seed, path) in tuples])
-    opt_df = pd.concat([generate_opt_df(parse_results(path, 'opt'), seed=seed) for (name, seed, path) in tuples])
+
+def analyse_and_plot_data(name: str, tuples: List[Tuple[int, str]], min_iter: int, max_iter: int) -> None:
+    print(f"Parsing paths for '{name}': " + str([path for counter, path in tuples]))
+
+    train_df = pd.concat([generate_df(parse_results(path, 'train'), seed=seed) for (seed, path) in tuples])
+    eval_df = pd.concat([generate_df(parse_results(path, 'eval'), seed=seed) for (seed, path) in tuples])
+    opt_df = pd.concat([generate_opt_df(parse_results(path, 'opt'), seed=seed) for (seed, path) in tuples])
 
     # Plot
     fig, axes = plt.subplots(ncols=2, nrows=1, figsize=(2 * fig_width, fig_height), constrained_layout=True)
 
     # Rollouts
-    plot_rollouts(axes[0], train_df, min_iter=args.min_iter, max_iter=args.max_iter, name='train')
-    plot_rollouts(axes[0], eval_df, min_iter=args.min_iter, max_iter=args.max_iter, name='eval')
+    plot_rollouts(axes[0], train_df, min_iter=min_iter, max_iter=max_iter, name='train')
+    plot_rollouts(axes[0], eval_df, min_iter=min_iter, max_iter=max_iter, name='eval')
 
     axes[0].set_xlabel('Iteration')
     axes[0].set_ylabel('Return')
     axes[0].legend()
 
     # Optimization
-    plot_optimization(axes[1], opt_df, min_iter=args.min_iter, max_iter=args.max_iter)
+    plot_optimization(axes[1], opt_df, min_iter=min_iter, max_iter=max_iter)
     axes[1].set_xlabel('Epoch')
     axes[1].set_ylabel('Loss')
     axes[1].legend()
 
-    fig.savefig('training.pdf')
+    fig.savefig(f'training_{name}.pdf')
     plt.close(fig)
+
+
+def main():
+    args = parse_args()
+    all_tuples = [(*parse_path(path), path) for path in get_paths(args.path)]
+    grouped_tuples = group_by_name(all_tuples)  # type: ignore
+
+    for name, tuples in grouped_tuples.items():
+        analyse_and_plot_data(name=name, tuples=tuples, min_iter=args.min_iter, max_iter=args.max_iter)
 
 
 if __name__ == '__main__':
