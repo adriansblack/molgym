@@ -42,7 +42,7 @@ class SimplePolicy(torch.nn.Module):
         training=False,
     ) -> Tuple[Dict[str, Union[torch.Tensor, TensorDict]], Dict[str, Any]]:
 
-        focus_logits = torch.ones(size=(state.elements.shape[0], ))  # Uniform
+        focus_logits = torch.ones(size=(state.elements.shape[0], ), device=state.elements.device)  # Uniform
         focus_probs = torch_scatter.scatter_softmax(src=focus_logits, index=state.batch, dim=-1)  # [num_nodes,]
         focus_distr = GraphCategoricalDistribution(probs=focus_probs, batch=state.batch, ptr=state.ptr)
 
@@ -55,7 +55,8 @@ class SimplePolicy(torch.nn.Module):
             focus = focus_distr.argmax()
 
         # Element
-        all_element_logits = torch.ones(size=(state.elements.shape[0], self.num_elements))  # Uniform
+        all_element_logits = torch.ones(size=(state.elements.shape[0], self.num_elements),
+                                        device=state.elements.device)  # Uniform
         all_element_probs = masked_softmax(all_element_logits, mask=(state.bag > 0)[state.batch])  # [n_nodes, n_z]
         focused_element_probs = all_element_probs[focus + state.ptr[:-1]]  # [n_graphs, n_z]
         element_distr = torch.distributions.Categorical(probs=focused_element_probs)
