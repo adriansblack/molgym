@@ -132,10 +132,10 @@ class Policy(torch.nn.Module):
         # Distance
         focused_inv = s_inv[focus + state.ptr[:-1]]
         d_input = torch.cat([focused_inv, element_oh], dim=-1)  # [n_graphs, n_hidden + n_z]
-        gmm_log_probs, d_mean_trans = self.phi_distance(d_input).split(self.num_gaussians, dim=-1)
-        d_mean = torch.tanh(d_mean_trans) * self.d_half_width + self.d_center
-        d_distr = GaussianMixtureModel(log_probs=gmm_log_probs,
-                                       means=d_mean,
+        gmm_logits, gmm_means_trans = self.phi_distance(d_input).split(self.num_gaussians, dim=-1)
+        gmm_means = torch.tanh(gmm_means_trans) * self.d_half_width + self.d_center
+        d_distr = GaussianMixtureModel(logits=gmm_logits,
+                                       means=gmm_means,
                                        stds=torch.exp(self.d_log_stds).clamp(min=1e-6))
 
         if action is not None:

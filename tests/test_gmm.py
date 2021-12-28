@@ -8,10 +8,10 @@ from molgym.tools import to_numpy
 def test_gmm():
     torch.manual_seed(1)
 
-    log_probs = torch.log(torch.tensor([[0.7, 0.3], [0.5, 0.5]]))
+    logits = torch.log(torch.tensor([[0.7, 0.3], [0.5, 0.5]]))
     means = torch.tensor([[-0.5, 0.3], [0.0, 0.2]])
     log_stds = torch.log(torch.tensor([[0.2, 0.5], [0.3, 0.2]]))
-    gmm = GaussianMixtureModel(log_probs=log_probs, means=means, stds=torch.exp(log_stds))
+    gmm = GaussianMixtureModel(logits=logits, means=means, stds=torch.exp(log_stds))
 
     samples = gmm.sample(torch.Size((3, )))
     assert samples.shape == (3, 2)

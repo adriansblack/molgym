@@ -6,12 +6,12 @@ import torch
 class GaussianMixtureModel(torch.distributions.MixtureSameFamily, ABC):
     def __init__(
         self,
-        log_probs: torch.Tensor,
+        logits: torch.Tensor,
         means: torch.Tensor,
         stds: torch.Tensor,
         validate_args=None,
     ) -> None:
-        categoricals = torch.distributions.Categorical(logits=log_probs, validate_args=validate_args)
+        categoricals = torch.distributions.Categorical(logits=logits, validate_args=validate_args)
         normals = torch.distributions.Normal(loc=means, scale=stds, validate_args=validate_args)
         super().__init__(mixture_distribution=categoricals, component_distribution=normals, validate_args=validate_args)
 
