@@ -52,13 +52,13 @@ def compute_surrogate_loss_policy(
     s_next = data.propagate_batch(batch['state'], response['action'], cutoff=cutoff)
     s_next.to(device)
 
-    q1 = ac.q1(s_next)  # [B, ]
-    q2 = ac.q2(s_next)  # [B, ]
-    q = torch.minimum(q1, q2)
+    with torch.no_grad():
+        q1 = ac.q1(s_next)  # [B, ]
+        q2 = ac.q2(s_next)  # [B, ]
+        q_no_grad = torch.minimum(q1, q2)
 
     # Entropy-regularized policy loss surrogate
-    # q_pi.detach() just to be sure
-    loss = ((alpha * response['logp'].detach() + alpha - q.detach()) * response['logp']).mean()
+    loss = ((alpha * response['logp'].detach() + alpha - q_no_grad) * response['logp']).mean()
 
     return loss
 
@@ -73,7 +73,6 @@ def train_epoch(
     cutoff: float,  # Angstrom
     device: torch.device,
 ) -> Dict[str, Any]:
-    """Updates the actor-critic."""
 
     infos: List[tools.TensorDict] = []
 
@@ -82,27 +81,14 @@ def train_epoch(
         batch = tools.dict_to_device(batch, device)
 
         optimizer.zero_grad()
-
-        # First run one gradient descent step for Q1 and Q2
         loss_q = compute_loss_q(ac, ac_target, batch, alpha=alpha, cutoff=cutoff, device=device)
-
-        # Freeze Q-network(s), so you don't waste computational effort
-        # computing gradients for them during the policy learning step.
-        ac.freeze_q()
-
-        # Next run one gradient descent step for pi.
-        loss_pi = compute_surrogate_loss_policy(ac, batch, alpha=alpha, cutoff=cutoff, device=device)
-
-        # Unfreeze Q-network(s), so you can optimize it at next step.
-        ac.unfreeze_q()
-
-        loss = loss_pi + loss_q
+        surrogate_loss_pi = compute_surrogate_loss_policy(ac, batch, alpha=alpha, cutoff=cutoff, device=device)
+        loss = surrogate_loss_pi + loss_q
         loss.backward()
         optimizer.step()
 
-        batch_info['loss_pi'] = loss_pi.detach().cpu()
         batch_info['loss_q'] = loss_q.detach().cpu()
-        batch_info['loss'] = loss.detach().cpu()
+        batch_info['surrogate_loss_pi'] = surrogate_loss_pi.detach().cpu()
 
         # Finally, update target networks by Polyak averaging.
         with torch.no_grad():

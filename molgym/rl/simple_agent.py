@@ -34,8 +34,8 @@ class SimplePolicy(torch.nn.Module):
     def forward(
         self,
         state: StateBatch,
-        action: Optional[TensorDict] = None,
-        training=False,
+        action: Optional[TensorDict],
+        training: bool,
     ) -> Tuple[Dict[str, Union[torch.Tensor, TensorDict]], Dict[str, Any]]:
 
         focus_logits = torch.ones(size=(state.elements.shape[0], ), device=state.elements.device)  # Uniform
@@ -103,11 +103,6 @@ class SimplePolicy(torch.nn.Module):
         return response, aux
 
 
-def requires_grad(module: torch.nn.Module, flag: bool) -> None:
-    for param in module.parameters():
-        param.requires_grad = flag
-
-
 class SimpleSACAgent(torch.nn.Module):
     def __init__(
         self,
@@ -142,14 +137,6 @@ class SimpleSACAgent(torch.nn.Module):
 
     def forward(self, *args, **kwargs):
         return self.policy(*args, **kwargs)
-
-    def freeze_q(self):
-        requires_grad(self.q1, False)
-        requires_grad(self.q2, False)
-
-    def unfreeze_q(self):
-        requires_grad(self.q1, True)
-        requires_grad(self.q2, True)
 
 
 class SimpleSACTarget(torch.nn.Module):

@@ -95,8 +95,8 @@ class Policy(torch.nn.Module):
     def forward(
         self,
         state: StateBatch,
-        action: Optional[TensorDict] = None,
-        training=False,
+        action: Optional[TensorDict],
+        training: bool,
     ) -> Tuple[Dict[str, Union[torch.Tensor, TensorDict]], Dict[str, Any]]:
         s_inter = self.embedding(state)
         s_cov = self.bag_tp(s_inter, state.bag[state.batch])
