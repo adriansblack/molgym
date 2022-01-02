@@ -260,12 +260,7 @@ def main():
         fig.update_layout(width=1200, height=1000, showlegend=False)
 
         plot_focus_distribution(fig, row=1, col=1, distr=distrs[0], focus=action['focus'][0])
-        plot_element_distribution(fig,
-                                  row=1,
-                                  col=2,
-                                  distr=distrs[1],
-                                  labels=symbols,
-                                  element=action['element'][0])
+        plot_element_distribution(fig, row=1, col=2, distr=distrs[1], labels=symbols, element=action['element'][0])
         plot_distance_distribution(fig,
                                    row=2,
                                    col=1,
