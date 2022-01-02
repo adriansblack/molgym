@@ -20,7 +20,7 @@ def compute_loss_q(
     # Bellman backup for Q functions
     with torch.no_grad():
         # Target actions come from *current* policy
-        response, _aux = ac.policy(batch['next_state'])
+        response, _aux = ac.policy(batch['next_state'], action=None, training=True)
         s_next_next = data.propagate_batch(batch['next_state'], response['action'], cutoff=cutoff)
         s_next_next.to(device)
 
@@ -48,7 +48,7 @@ def compute_surrogate_loss_policy(
     cutoff: float,
     device: torch.device,
 ) -> torch.Tensor:
-    response, _aux = ac.policy(batch['state'])
+    response, _aux = ac.policy(batch['state'], action=None, training=True)
     s_next = data.propagate_batch(batch['state'], response['action'], cutoff=cutoff)
     s_next.to(device)
 
