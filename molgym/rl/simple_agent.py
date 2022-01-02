@@ -7,7 +7,7 @@ import torch_scatter
 from e3nn import o3
 
 from molgym.data import StateBatch, FOCUS_KEY, ELEMENT_KEY, DISTANCE_KEY, ORIENTATION_KEY
-from molgym.distributions import GraphCategoricalDistribution, GaussianMixtureModel
+from molgym.distributions import GraphCategoricalDistribution
 from molgym.tools import TensorDict, masked_softmax
 from .q_function import QFunction
 
@@ -16,22 +16,18 @@ class SimplePolicy(torch.nn.Module):
     def __init__(
         self,
         num_elements: int,
-        num_gaussians: int,
         min_max_distance: Tuple[float, float],
     ):
         super().__init__()
         self.num_elements = num_elements
 
         # Distance
-        self.num_gaussians = num_gaussians
-        self.min_max_distance = min_max_distance
-        min_distance, max_distance = self.min_max_distance
+        min_distance, max_distance = min_max_distance
         self.d_center = torch.tensor((min_distance + max_distance) / 2)
         self.d_half_width = torch.tensor((max_distance - min_distance) / 2)
 
-        self.gmm_logits = torch.nn.Parameter(torch.tensor([[1.0] * self.num_gaussians]), requires_grad=True)
-        self.d_mean_trans = torch.nn.Parameter(torch.tensor([[0.0] * self.num_gaussians]), requires_grad=True)
-        self.d_log_stds = torch.nn.Parameter(torch.tensor([np.log(0.2)] * self.num_gaussians), requires_grad=True)
+        self.d_mean_trans = torch.nn.Parameter(torch.tensor([[0.0]]), requires_grad=True)
+        self.d_log_stds = torch.nn.Parameter(torch.tensor([np.log(0.2)]), requires_grad=True)
 
         self.orientation_template = torch.tensor([[1.0, 0.0, 0.0]])
 
@@ -69,17 +65,15 @@ class SimplePolicy(torch.nn.Module):
             element = torch.argmax(element_distr.probs, dim=-1)
 
         # Distance
-        gmm_means = torch.tanh(self.d_mean_trans.expand(state.num_graphs, -1)) * self.d_half_width + self.d_center
-        d_distr = GaussianMixtureModel(logits=self.gmm_logits.expand(state.num_graphs, -1),
-                                       means=gmm_means,
-                                       stds=torch.exp(self.d_log_stds).clamp(min=1e-6))
+        d_mean = torch.tanh(self.d_mean_trans.expand(state.num_graphs, -1)) * self.d_half_width + self.d_center
+        d_distr = torch.distributions.Normal(loc=d_mean, scale=torch.exp(self.d_log_stds).clamp(min=1e-6))
 
         if action is not None:
             distance = action[DISTANCE_KEY]
         elif training:
             distance = d_distr.sample()
         else:
-            distance = d_distr.argmax()
+            distance = d_mean
 
         # Orientation
         if action is not None:
@@ -125,14 +119,12 @@ class SimpleSACAgent(torch.nn.Module):
         num_elements: int,
         hidden_irreps: o3.Irreps,
         network_width: int,
-        num_gaussians: int,
         min_max_distance: Tuple[float, float],
     ):
         super().__init__()
 
         self.policy = SimplePolicy(
             num_elements=num_elements,
-            num_gaussians=num_gaussians,
             min_max_distance=min_max_distance,
         )
 

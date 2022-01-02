@@ -69,7 +69,6 @@ def main() -> None:
         num_elements=len(z_table),
         hidden_irreps=o3.Irreps(args.hidden_irreps),
         network_width=args.network_width,
-        num_gaussians=args.num_gaussians,
         min_max_distance=(args.d_min, args.d_max),
     )
     agent.to(device)
