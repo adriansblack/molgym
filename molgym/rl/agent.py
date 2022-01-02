@@ -59,14 +59,6 @@ class SACAgent(torch.nn.Module):
     def forward(self, *args, **kwargs):
         return self.policy(*args, **kwargs)
 
-    def freeze_q(self):
-        requires_grad(self.q1, False)
-        requires_grad(self.q2, False)
-
-    def unfreeze_q(self):
-        requires_grad(self.q1, True)
-        requires_grad(self.q2, True)
-
 
 class SACTarget(torch.nn.Module):
     def __init__(self, agent: SACAgent):
