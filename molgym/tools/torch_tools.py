@@ -1,6 +1,6 @@
 import collections
 import logging
-from typing import Dict, Sequence, List, Callable, Any
+from typing import Dict, Sequence, List, Callable, Any, Iterable
 
 import numpy as np
 import torch
@@ -96,3 +96,13 @@ dtype_dict = {'float32': torch.float32, 'float64': torch.float64}
 
 def set_default_dtype(dtype: str) -> None:
     torch.set_default_dtype(dtype_dict[dtype])
+
+
+def compute_gradient_norm(params: Iterable[torch.nn.Parameter], norm_type: int = 2) -> torch.Tensor:
+    params = list(filter(lambda p: p.grad is not None, params))
+    if len(params) == 0:
+        return torch.tensor(0.0)
+
+    with torch.no_grad():
+        total_norm = torch.norm(torch.stack([torch.norm(p.grad, p=norm_type) for p in params]), p=norm_type)
+        return total_norm

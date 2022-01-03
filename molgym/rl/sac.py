@@ -88,6 +88,9 @@ def train_epoch(
         optimizer.step()
 
         batch_info['loss_q'] = loss_q.detach().cpu()
+        batch_info['grad_norm_pi'] = tools.compute_gradient_norm(ac.policy.parameters())
+        batch_info['grad_norm_q1'] = tools.compute_gradient_norm(ac.q1.parameters())
+        batch_info['grad_norm_q2'] = tools.compute_gradient_norm(ac.q2.parameters())
         batch_info['surrogate_loss_pi'] = surrogate_loss_pi.detach().cpu()
 
         # Finally, update target networks by Polyak averaging.
