@@ -79,6 +79,7 @@ def main() -> None:
     dataset = []
     trajectory_lengths = []
     for i in range(args.num_iters):
+        logging.info(f'Iteration {i}')
         # Collect data
         num_episodes = args.num_episodes_per_iter if i > 0 else args.num_initial_episodes
         logging.debug(f'Rollout with {num_episodes} episodes')
@@ -150,7 +151,7 @@ def main() -> None:
             tau_eval['iteration'] = i
             tau_eval['kind'] = 'eval'
             logger.log(tau_eval)
-            logging.info(f'Evaluation return: {tau_eval["return"]:.3f}')
+            logging.info(f'eval_return={tau_eval["return"]:.3f}')
 
             terminal_atoms = [
                 data.state_to_atoms(tau[-1].next_state, z_table, info={'reward': tau[-1].reward})
