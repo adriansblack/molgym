@@ -88,7 +88,7 @@ def plot_optimization(ax: plt.Axes, df: pd.DataFrame, min_iter: int, max_iter: i
     df = df[(min_iter <= df['iteration']) & (df['iteration'] <= max_iter)]
     df = df.groupby(['iteration', 'epoch']).agg(['mean', 'std']).reset_index()
 
-    for k in ['loss_q', 'loss_pi', 'loss']:
+    for k in ['loss_q', 'surrogate_loss_pi']:
         ax.plot(df.index, df[k]['mean'], label=k)
 
 
