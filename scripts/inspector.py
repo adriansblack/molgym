@@ -238,7 +238,7 @@ def main():
 
     for batch in data_loader:
         batch = tools.dict_to_device(batch, device)
-        output, aux = model(batch['state'], batch['action'])
+        output, aux = model(batch['state'], action=batch['action'], training=False)
         action = output['action']
         distrs = aux['distrs']
 
