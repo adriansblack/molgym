@@ -50,6 +50,10 @@ def main() -> None:
         min_max_distance=(args.d_min, args.d_max),
         beta=args.beta,
     )
+    logging.info('Saving initial model')
+    os.makedirs(name=args.checkpoint_dir, exist_ok=True)
+    torch.save(agent.cpu(), os.path.join(args.checkpoint_dir, f'init_agent_{tag}.model'))
+
     agent.to(device)
     logging.info(agent)
     target = rl.SACTarget(agent)
