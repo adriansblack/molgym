@@ -50,16 +50,14 @@ def main() -> None:
         min_max_distance=(args.d_min, args.d_max),
         beta=args.beta,
     )
-    logging.info('Saving initial model')
-    os.makedirs(name=args.checkpoint_dir, exist_ok=True)
-    torch.save(agent.cpu(), os.path.join(args.checkpoint_dir, f'init_agent_{tag}.model'))
-
-    agent.to(device)
     logging.info(agent)
     target = rl.SACTarget(agent)
-    target.to(device)
     logging.info(target)
     logging.info(f'Number of parameters: {sum(tools.count_parameters(m) for m in [agent, target])}')
+
+    logging.info('Saving model')
+    os.makedirs(name=args.checkpoint_dir, exist_ok=True)
+    torch.save(agent.cpu(), os.path.join(args.checkpoint_dir, f'init_agent_{tag}.model'))
 
     # Optimizers
     optimizer = torch.optim.AdamW(
@@ -79,11 +77,16 @@ def main() -> None:
     # Checkpointing
     handler = tools.CheckpointHandler(directory=args.checkpoint_dir, tag=tag, keep=True)
 
+    # Send models to device
+    agent.to(device)
+    target.to(device)
+
     highest_return = -np.inf
     dataset = []
     trajectory_lengths = []
     for i in range(args.num_iters):
         logging.info(f'Iteration {i}')
+
         # Collect data
         num_episodes = args.num_episodes_per_iter if i > 0 else args.num_initial_episodes
         logging.debug(f'Rollout with {num_episodes} episodes')
