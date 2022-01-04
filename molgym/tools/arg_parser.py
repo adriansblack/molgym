@@ -1,4 +1,5 @@
 import argparse
+from typing import Optional
 
 
 def build_default_arg_parser() -> argparse.ArgumentParser:
@@ -56,7 +57,10 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument('--num_iters', help='maximum number of iterations', type=int, default=100)
     parser.add_argument('--num_initial_episodes', help='initial number of episodes', type=int, default=64)
     parser.add_argument('--num_episodes_per_iter', help='number of episodes per iteration', type=int, default=16)
-    parser.add_argument('--max_num_episodes', help='maximum number of episodes in buffer', type=int, default=1024)
+    parser.add_argument('--max_num_episodes',
+                        help='maximum number of episodes in buffer',
+                        type=int_or_none,
+                        default=1024)
     parser.add_argument('--num_envs', help='number of environment copies', type=int, default=4)
     parser.add_argument('--num_paths_per_atom',
                         help='number of paths per atom in configuration',
@@ -69,3 +73,12 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
                         default=0.995)
 
     return parser
+
+
+def int_or_none(value: str) -> Optional[int]:
+    try:
+        return int(value)
+    except ValueError:
+        if value != 'None':
+            raise argparse.ArgumentTypeError(f'{value} is an invalid value (int or None)') from None
+        return None

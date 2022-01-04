@@ -110,7 +110,8 @@ def main() -> None:
 
         # Update buffer
         trajectory_lengths += [len(tau) for tau in new_trajectories]
-        trajectory_lengths = trajectory_lengths[-args.max_num_episodes:]
+        if args.max_num_episodes is not None:
+            trajectory_lengths = trajectory_lengths[-args.max_num_episodes:]
         dataset += [data.process_sars(sars=sars, cutoff=args.d_max) for tau in new_trajectories for sars in tau]
         dataset = dataset[-sum(trajectory_lengths):]
 
