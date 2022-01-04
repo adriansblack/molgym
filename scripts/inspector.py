@@ -16,6 +16,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Agent Inspector')
 
     parser.add_argument('--model', help='path to model', type=str, required=True)
+    parser.add_argument('--checkpoint', help='path to checkpoint', type=str, required=False)
     parser.add_argument('--zs', help='atomic numbers in table', type=str, required=True)
     parser.add_argument('--xyz', help='path to trajectory (.xyz)', type=str, required=True)
     parser.add_argument('--index', help='config in XYZ file', type=int, required=False, default=0)
@@ -217,8 +218,13 @@ def main():
     device = tools.init_device(args.device)
     tools.set_default_dtype(args.default_dtype)
 
-    # Load model and data
+    # Load model (and update parameters)
     model = torch.load(f=args.model, map_location=device)
+    if args.checkpoint:
+        checkpoint = torch.load(f=args.checkpoint, map_location=device)
+        model.load_state_dict(checkpoint['model'], strict=True)  # type: ignore
+
+    # Load data
     atoms = ase.io.read(args.xyz, format='extxyz', index=args.index)
 
     # Parse Z table
