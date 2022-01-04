@@ -78,17 +78,25 @@ def generate_opt_df(dicts: List[Dict], seed: int) -> pd.DataFrame:
 
 
 def plot_rollouts(ax: plt.Axes, df: pd.DataFrame, min_iter: int, max_iter: int, name: str) -> None:
-    df = df[(min_iter <= df['iteration']) & (df['iteration'] <= max_iter)]
     df = df.groupby(['iteration']).agg(['mean', 'std']).reset_index()
+    df = df[(min_iter <= df['iteration']) & (df['iteration'] <= max_iter)]
 
     ax.plot(df['iteration'], df['return']['mean'], zorder=1, label=name)
 
 
 def plot_optimization(ax: plt.Axes, df: pd.DataFrame, min_iter: int, max_iter: int) -> None:
-    df = df[(min_iter <= df['iteration']) & (df['iteration'] <= max_iter)]
     df = df.groupby(['iteration', 'epoch']).agg(['mean', 'std']).reset_index()
+    df = df[(min_iter <= df['iteration']) & (df['iteration'] <= max_iter)]
 
     for k in ['loss_q', 'surrogate_loss_pi']:
+        ax.plot(df.index, df[k]['mean'], label=k)
+
+
+def plot_gradients(ax: plt.Axes, df: pd.DataFrame, min_iter: int, max_iter: int) -> None:
+    df = df.groupby(['iteration', 'epoch']).agg(['mean', 'std']).reset_index()
+    df = df[(min_iter <= df['iteration']) & (df['iteration'] <= max_iter)]
+
+    for k in ['grad_norm_pi', 'grad_norm_q1', 'grad_norm_q2']:
         ax.plot(df.index, df[k]['mean'], label=k)
 
 
@@ -107,21 +115,30 @@ def analyse_and_plot_data(name: str, tuples: List[Tuple[int, str]], min_iter: in
     opt_df = pd.concat([generate_opt_df(parse_results(path, 'opt'), seed=seed) for (seed, path) in tuples])
 
     # Plot
-    fig, axes = plt.subplots(ncols=2, nrows=1, figsize=(2 * fig_width, fig_height), constrained_layout=True)
+    fig, axes = plt.subplots(ncols=3, nrows=1, figsize=(3 * fig_width, fig_height), constrained_layout=True)
 
     # Rollouts
-    plot_rollouts(axes[0], train_df, min_iter=min_iter, max_iter=max_iter, name='train')
-    plot_rollouts(axes[0], eval_df, min_iter=min_iter, max_iter=max_iter, name='eval')
+    ax = axes[0]
+    plot_rollouts(ax, train_df, min_iter=min_iter, max_iter=max_iter, name='train')
+    plot_rollouts(ax, eval_df, min_iter=min_iter, max_iter=max_iter, name='eval')
 
-    axes[0].set_xlabel('Iteration')
-    axes[0].set_ylabel('Return')
-    axes[0].legend()
+    ax.set_xlabel('Iteration')
+    ax.set_ylabel('Return')
+    ax.legend()
 
     # Optimization
-    plot_optimization(axes[1], opt_df, min_iter=min_iter, max_iter=max_iter)
-    axes[1].set_xlabel('Epoch')
-    axes[1].set_ylabel('Loss')
-    axes[1].legend()
+    ax = axes[1]
+    plot_optimization(ax, opt_df, min_iter=min_iter, max_iter=max_iter)
+    ax.set_xlabel('Epoch')
+    ax.set_ylabel('Loss')
+    ax.legend()
+
+    # Gradients
+    ax = axes[2]
+    plot_gradients(ax, opt_df, min_iter=min_iter, max_iter=max_iter)
+    ax.set_xlabel('Epoch')
+    ax.set_ylabel('Gradient Norm')
+    ax.legend()
 
     fig.savefig(f'training_{name}.pdf')
     plt.close(fig)
