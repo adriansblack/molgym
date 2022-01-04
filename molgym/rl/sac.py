@@ -24,14 +24,14 @@ def compute_loss_q(
         s_next_next = data.propagate_batch(batch['next_state'], response['action'], cutoff=cutoff)
         s_next_next.to(device)
 
-        # Target Q-values
+        # Target Q-values Q(T(s', a'))
         q1_target = ac_target.q1(s_next_next)  # [B, ]
         q2_target = ac_target.q2(s_next_next)  # [B, ]
         q_target = torch.minimum(q1_target, q2_target)
         backup = batch['reward'] + (1 - batch['done']) * (q_target - alpha * response['logp'])
 
     # MSE loss against Bellman backup
-    q1 = ac.q1(batch['next_state'])
+    q1 = ac.q1(batch['next_state'])  # Q(T(s, a))
     q2 = ac.q2(batch['next_state'])
 
     loss_q1 = torch.square(q1 - backup).mean()
