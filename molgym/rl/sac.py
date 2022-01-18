@@ -53,13 +53,17 @@ def compute_surr_loss_policy(
     s_next.to(device)
 
     with torch.no_grad():
+        v1 = ac.q1(batch['state'])  # [B, ]
+        v2 = ac.q2(batch['state'])  # [B, ]
+        v_no_grad = torch.minimum(v1, v2)
+
         q1 = ac.q1(s_next)  # [B, ]
         q2 = ac.q2(s_next)  # [B, ]
         q_no_grad = torch.minimum(q1, q2)
 
     # Entropy-regularized policy loss surrogate
     entropy_term = ((alpha * response['logp'].detach() + alpha) * response['logp']).mean()
-    q_term = (-q_no_grad * response['logp']).mean()
+    q_term = (v_no_grad - q_no_grad * response['logp']).mean()
 
     return entropy_term, q_term
 
