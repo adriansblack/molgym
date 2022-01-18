@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Tuple
 
 import torch
 from torch.optim import Optimizer
@@ -41,13 +41,13 @@ def compute_loss_q(
     return loss
 
 
-def compute_surrogate_loss_policy(
+def compute_surr_loss_policy(
     ac: SACAgent,
     batch: Dict,
     alpha: float,
     cutoff: float,
     device: torch.device,
-) -> torch.Tensor:
+) -> Tuple[torch.Tensor, torch.Tensor]:
     response, _aux = ac.policy(batch['state'], action=None, training=True)
     s_next = data.propagate_batch(batch['state'], response['action'], cutoff=cutoff)
     s_next.to(device)
@@ -58,9 +58,10 @@ def compute_surrogate_loss_policy(
         q_no_grad = torch.minimum(q1, q2)
 
     # Entropy-regularized policy loss surrogate
-    loss = ((alpha * response['logp'].detach() + alpha - q_no_grad) * response['logp']).mean()
+    entropy_term = ((alpha * response['logp'].detach() + alpha) * response['logp']).mean()
+    q_term = (-q_no_grad * response['logp']).mean()
 
-    return loss
+    return entropy_term, q_term
 
 
 def train_epoch(
@@ -82,16 +83,22 @@ def train_epoch(
 
         optimizer.zero_grad()
         loss_q = compute_loss_q(ac, ac_target, batch, alpha=alpha, cutoff=cutoff, device=device)
-        surrogate_loss_pi = compute_surrogate_loss_policy(ac, batch, alpha=alpha, cutoff=cutoff, device=device)
-        loss = surrogate_loss_pi + loss_q
+        surr_loss_pi_ent, surr_loss_pi_q = compute_surr_loss_policy(ac,
+                                                                    batch,
+                                                                    alpha=alpha,
+                                                                    cutoff=cutoff,
+                                                                    device=device)
+        loss = surr_loss_pi_ent + surr_loss_pi_q + loss_q
         loss.backward()
         optimizer.step()
 
         batch_info['loss_q'] = loss_q.detach().cpu()
+        batch_info['surr_loss_pi_ent'] = surr_loss_pi_ent.detach().cpu()
+        batch_info['surr_loss_pi_q'] = surr_loss_pi_q.detach().cpu()
+
         batch_info['grad_norm_pi'] = tools.compute_gradient_norm(ac.policy.parameters())
         batch_info['grad_norm_q1'] = tools.compute_gradient_norm(ac.q1.parameters())
         batch_info['grad_norm_q2'] = tools.compute_gradient_norm(ac.q2.parameters())
-        batch_info['surrogate_loss_pi'] = surrogate_loss_pi.detach().cpu()
 
         # Finally, update target networks by Polyak averaging.
         with torch.no_grad():
