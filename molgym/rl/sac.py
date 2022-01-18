@@ -62,8 +62,8 @@ def compute_surr_loss_policy(
         q_no_grad = torch.minimum(q1, q2)
 
     # Entropy-regularized policy loss surrogate
-    entropy_term = ((alpha * response['logp'].detach() + alpha) * response['logp']).mean()
-    q_term = (v_no_grad - q_no_grad * response['logp']).mean()
+    entropy_term = alpha * torch.mean((response['logp'].detach() + 1) * response['logp'])
+    q_term = torch.mean((v_no_grad - q_no_grad) * response['logp'])
 
     return entropy_term, q_term
 
