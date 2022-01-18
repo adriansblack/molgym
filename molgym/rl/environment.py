@@ -106,9 +106,9 @@ class DiscreteMolecularEnvironment(MolecularEnvironment):
             logging.debug('Two atoms are too close')
             return False
 
-        if not self._last_covered(state):
-            logging.debug('There is a single atom floating around')
-            return False
+        # if not self._last_covered(state):
+        #     logging.debug('There is a single atom floating around')
+        #     return False
 
         return True
 
