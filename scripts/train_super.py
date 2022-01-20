@@ -117,6 +117,7 @@ def main() -> None:
     sars_list: List[data.SARS] = []
     seed = 0
     for atoms in atoms_list:
+        terminal_state = data.get_state_from_atoms(atoms, z_table)
         e_inter = get_interaction_energy(config=data.config_from_atoms(atoms), z_energies=z_energies)
         graph = graph_tools.generate_topology(atoms.positions, cutoff_distance=args.d_max)
 
@@ -124,9 +125,10 @@ def main() -> None:
         for _ in range(num_paths):
             sequence = graph_tools.breadth_first_rollout(graph, seed=seed)
             sars_list += data.generate_sparse_reward_trajectory(
-                atoms=ase.Atoms([atoms[i] for i in sequence]),
+                terminal_state=data.State(elements=terminal_state.elements[sequence],
+                                          positions=terminal_state.positions[sequence],
+                                          bag=terminal_state.bag),
                 final_reward=e_inter,
-                z_table=z_table,
             )
             seed += 1
 
@@ -199,7 +201,8 @@ def main() -> None:
     logging.info(f'Loaded model from epoch {epoch}')
 
     # Test policy
-    initial_state = data.get_state_from_atoms(atoms=atoms_list[0], index=0, z_table=z_table)
+    terminal_state = data.get_state_from_atoms(atoms=atoms_list[0], z_table=z_table)
+    initial_state = data.rewind_state(terminal_state, 0)
     terminals, action_sequences = sample_trajectories(
         policy,
         initial_state=initial_state,

@@ -137,48 +137,64 @@ def get_action(
     )
 
 
-def get_state_from_atoms(atoms: ase.Atoms, index: int, z_table: AtomicNumberTable) -> State:
-    placed, remaining = atoms[:index], atoms[index:]
+def get_state_from_atoms(atoms: ase.Atoms, z_table: AtomicNumberTable) -> State:
+    if len(atoms) == 0:
+        elements = np.array([0], dtype=int)
+        positions = np.array([[0.0, 0.0, 0.0]], dtype=float)
+    else:
+        elements = np.array([z_table.z_to_index(ase.data.atomic_numbers[s]) for s in atoms.symbols])
+        positions = atoms.positions
+
+    bag = bag_from_atomic_numbers(zs=[0], z_table=z_table)
+    return State(elements, positions, bag)
+
+
+def rewind_state(s: State, index: int) -> State:
     if index == 0:
         elements = np.array([0], dtype=int)
         positions = np.array([[0.0, 0.0, 0.0]], dtype=float)
     else:
-        elements = np.array([z_table.z_to_index(ase.data.atomic_numbers[s]) for s in placed.symbols])
-        positions = placed.positions
+        elements = s.elements[:index]
+        positions = s.positions[:index]
 
-    if index >= len(atoms):
-        bag = bag_from_atomic_numbers(zs=[0], z_table=z_table)
-    else:
-        bag = bag_from_atomic_numbers(zs=(ase.data.atomic_numbers[s] for s in remaining.symbols), z_table=z_table)
+    # Place remaining atoms into bag
+    bag = s.bag
+    for e in s.elements[index:]:
+        bag = add_element_to_bag(e, bag)
+
+    if not no_real_atoms_in_bag(bag) and bag[0] != 0:
+        bag = remove_element_from_bag(0, bag)
+
     return State(elements, positions, bag)
 
 
 def generate_sparse_reward_trajectory(
-    atoms: ase.Atoms,
-    z_table: AtomicNumberTable,
+    terminal_state: State,
     final_reward: float,
     focuses: Optional[List[Optional[int]]] = None,
 ) -> Trajectory:
     if focuses is None:
-        focuses = [None] * len(atoms)
+        focuses = [None] * len(terminal_state.elements)
+    else:
+        assert len(terminal_state.elements) == len(focuses)
 
     tau = []
-    state = get_state_from_atoms(atoms, index=0, z_table=z_table)
+    state = rewind_state(terminal_state, index=0)
     for i, focus in enumerate(focuses):
         action = get_action(
             state=state,
             focus=focus,
-            element=z_table.z_to_index(ase.data.atomic_numbers[atoms[i].symbol]),
-            position=atoms[i].position,
+            element=terminal_state.elements[i],
+            position=terminal_state.positions[i],
         )
-        next_state = get_state_from_atoms(atoms, index=i + 1, z_table=z_table)
+        next_state = rewind_state(terminal_state, index=i + 1)
         tau.append(
             SARS(
                 state=state,
                 action=action,
-                reward=final_reward if i == len(atoms) - 1 else 0.0,
+                reward=final_reward if i == len(terminal_state.elements) - 1 else 0.0,
                 next_state=next_state,
-                done=i == len(atoms) - 1,
+                done=i == len(terminal_state.elements) - 1,
             ))
 
         state = next_state

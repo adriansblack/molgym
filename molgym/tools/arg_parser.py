@@ -71,6 +71,7 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
                         help='interpolation factor in polyak averaging for target networks',
                         type=float,
                         default=0.995)
+    parser.add_argument('--min_reward', help='minimal reward', type=float, default=-0.6)
 
     return parser
 

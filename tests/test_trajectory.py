@@ -69,8 +69,9 @@ def test_disjoint_graph(ethanol):
 def test_rollout(ethanol):
     z_table = data.AtomicNumberTable([0, 1, 6, 8])
 
-    state = data.get_state_from_atoms(ethanol, 0, z_table)
-    for sars in generate_sparse_reward_trajectory(ethanol, z_table, final_reward=0.0):
+    terminal_state = data.get_state_from_atoms(ethanol, z_table)
+    state = data.rewind_state(terminal_state, index=0)
+    for sars in generate_sparse_reward_trajectory(terminal_state, final_reward=0.0):
         state = propagate(state, sars.action)
     atoms = state_to_atoms(state, z_table)
 
@@ -82,7 +83,8 @@ def test_rollout(ethanol):
 
 def test_trajectory_generation(ethanol):
     z_table = data.AtomicNumberTable([0, 1, 6, 8])
-    trajectory = generate_sparse_reward_trajectory(atoms=ethanol, z_table=z_table, final_reward=1.5)
+    terminal_state = data.get_state_from_atoms(ethanol, z_table)
+    trajectory = generate_sparse_reward_trajectory(terminal_state, final_reward=1.5)
 
     assert all(not sars.done for sars in trajectory[:-1])
     assert trajectory[-1].done
@@ -115,7 +117,8 @@ def test_propagate():
 
 def test_data_loader(ethanol):
     z_table = data.AtomicNumberTable([0, 1, 6, 8])
-    sars_list = generate_sparse_reward_trajectory(ethanol, z_table, final_reward=1.0)
+    terminal_state = data.get_state_from_atoms(ethanol, z_table)
+    sars_list = generate_sparse_reward_trajectory(terminal_state, final_reward=1.0)
     batch_size = 5
 
     loader = data.DataLoader(
@@ -153,7 +156,8 @@ def test_data_loader(ethanol):
 def test_batch_propagate(ethanol):
     cutoff = 1.7
     z_table = data.AtomicNumberTable([0, 1, 6, 8])
-    sars_list = generate_sparse_reward_trajectory(ethanol, z_table, final_reward=1.0)
+    terminal_state = data.get_state_from_atoms(ethanol, z_table)
+    sars_list = generate_sparse_reward_trajectory(terminal_state, final_reward=1.0)
     loader = data.DataLoader(
         dataset=[data.process_sars(sars=sars, cutoff=cutoff) for sars in sars_list],
         batch_size=3,

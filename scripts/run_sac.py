@@ -1,7 +1,7 @@
 import argparse
 import logging
 import os
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import ase
 import ase.io
@@ -16,6 +16,30 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument('--zs', help='atomic numbers (e.g.: 1,6,7,8)', type=str, required=True)
     parser.add_argument('--bag', help='chemical formula of initial state (e.g.: H2O)', type=str, required=True)
     return parser
+
+
+def create_trajectories(
+    terminal_state: data.State,
+    final_reward: float,
+    cutoff: float,
+    num_paths_per_atom: float,
+    seed: int,
+) -> List[data.Trajectory]:
+    graph = data.graph_tools.generate_topology(terminal_state.positions, cutoff_distance=cutoff)
+    num_paths = int(num_paths_per_atom * len(terminal_state.elements))
+
+    taus: List[data.Trajectory] = []
+    for i in range(num_paths):
+        sequence = data.graph_tools.breadth_first_rollout(graph, seed=seed + i)
+        tau = data.generate_sparse_reward_trajectory(
+            terminal_state=data.State(elements=terminal_state.elements[sequence],
+                                      positions=terminal_state.positions[sequence],
+                                      bag=terminal_state.bag),
+            final_reward=final_reward,
+        )
+        taus.append(tau)
+
+    return taus
 
 
 def main() -> None:
@@ -69,10 +93,13 @@ def main() -> None:
 
     # Set up environment(s)
     reward_fn = rl.SparseInteractionReward()
-    initial_state = data.get_state_from_atoms(ase.Atoms(args.bag), index=0, z_table=z_table)
+    dummy_state = data.get_state_from_atoms(ase.Atoms(args.bag), z_table=z_table)
+    initial_state = data.rewind_state(dummy_state, 0)
     logging.info('Initial state: ' + str(initial_state))
-    envs = rl.EnvironmentCollection(
-        [rl.DiscreteMolecularEnvironment(reward_fn, initial_state, z_table) for _ in range(args.num_envs)])
+    envs = rl.EnvironmentCollection([
+        rl.DiscreteMolecularEnvironment(reward_fn, initial_state, z_table, min_reward=args.min_reward)
+        for _ in range(args.num_envs)
+    ])
 
     # Checkpointing
     handler = tools.CheckpointHandler(directory=args.checkpoint_dir, tag=tag, keep=True)
@@ -107,6 +134,21 @@ def main() -> None:
         tau_info['iteration'] = i
         tau_info['kind'] = 'train'
         logger.log(tau_info)
+
+        # Create new trajectories
+        generated_trajectories = []
+        for new_trajectory in new_trajectories:
+            # Check if episode was terminated by environment
+            if new_trajectory[-1].reward <= args.min_reward:
+                continue
+            generated_trajectories += create_trajectories(
+                terminal_state=new_trajectory[-1].next_state,
+                final_reward=new_trajectory[-1].reward,
+                cutoff=args.r_max,
+                num_paths_per_atom=args.num_paths_per_atom,
+                seed=args.seed,
+            )
+        new_trajectories += generated_trajectories
 
         # Update buffer
         trajectory_lengths += [len(tau) for tau in new_trajectories]
