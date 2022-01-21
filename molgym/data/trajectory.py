@@ -99,7 +99,7 @@ def propagate(state: State, action: Action) -> State:
 
 
 def state_to_atoms(state: State, z_table: AtomicNumberTable, info: Optional[Dict] = None) -> ase.Atoms:
-    d = {'bag': {ase.data.chemical_symbols[z_table.index_to_z(i)]: int(v) for i, v in enumerate(state.bag)}}
+    d = {BAG_KEY: {ase.data.chemical_symbols[z_table.index_to_z(i)]: int(v) for i, v in enumerate(state.bag)}}
     if info is not None:
         d.update(info)
     return ase.Atoms(
