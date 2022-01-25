@@ -15,8 +15,9 @@ from molgym import tools, data, rl
 
 def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument('--zs', help='atomic numbers (e.g.: 1,6,7,8)', type=str, required=True)
-    parser.add_argument('--bag', help='chemical formula of initial state (e.g.: H2O)', type=str, required=True)
-    parser.add_argument('--initial_state', help='path to XYZ file', type=str, required=False)
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('--bag', help='chemical formula of initial state (e.g.: H2O)', type=str, required=False)
+    group.add_argument('--initial_state', help='path to XYZ file', type=str, required=False)
     return parser
 
 
