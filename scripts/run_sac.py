@@ -5,6 +5,7 @@ from typing import Any, Dict, List
 
 import ase
 import ase.io
+import ase.data
 import numpy as np
 import torch
 from e3nn import o3
@@ -15,11 +16,13 @@ from molgym import tools, data, rl
 def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument('--zs', help='atomic numbers (e.g.: 1,6,7,8)', type=str, required=True)
     parser.add_argument('--bag', help='chemical formula of initial state (e.g.: H2O)', type=str, required=True)
+    parser.add_argument('--initial_state', help='path to XYZ file', type=str, required=False)
     return parser
 
 
 def create_trajectories(
     terminal_state: data.State,
+    start_index: int,
     final_reward: float,
     cutoff: float,
     num_paths_per_atom: float,
@@ -30,12 +33,13 @@ def create_trajectories(
 
     taus: List[data.Trajectory] = []
     for i in range(num_paths):
-        sequence = data.graph_tools.breadth_first_rollout(graph, seed=seed + i)
+        sequence = data.graph_tools.breadth_first_rollout(graph, seed=seed + i, visited=list(range(start_index)))
         tau = data.generate_sparse_reward_trajectory(
             terminal_state=data.State(elements=terminal_state.elements[sequence],
                                       positions=terminal_state.positions[sequence],
                                       bag=terminal_state.bag),
             final_reward=final_reward,
+            start_index=start_index,
         )
         taus.append(tau)
 
@@ -93,9 +97,14 @@ def main() -> None:
 
     # Set up environment(s)
     reward_fn = rl.SparseInteractionReward()
-    dummy_state = data.get_state_from_atoms(ase.Atoms(args.bag), z_table=z_table)
-    initial_state = data.rewind_state(dummy_state, 0)
-    logging.info('Initial state: ' + str(initial_state))
+    if args.initial_state:
+        atoms = ase.io.read(args.initial_state, index=0, format='extxyz')
+        initial_state = data.state_from_atoms(atoms, z_table=z_table)
+    else:
+        dummy_state = data.state_from_atoms(ase.Atoms(args.bag), z_table=z_table)
+        initial_state = data.rewind_state(dummy_state, 0)
+
+    logging.info(f'Initial state: canvas={len(initial_state.elements)} atom(s), bag={initial_state.bag}')
     envs = rl.EnvironmentCollection([
         rl.DiscreteMolecularEnvironment(reward_fn, initial_state, z_table, min_reward=args.min_reward)
         for _ in range(args.num_envs)
@@ -141,8 +150,12 @@ def main() -> None:
             # Check if episode was terminated by environment
             if new_trajectory[-1].reward <= args.min_reward:
                 continue
+
+            first_state = new_trajectory[0].state
             generated_trajectories += create_trajectories(
                 terminal_state=new_trajectory[-1].next_state,
+                # make sure the first atom is not a dummy atom
+                start_index=len(first_state.elements) if first_state.elements[0] != 0 else 0,
                 final_reward=new_trajectory[-1].reward,
                 cutoff=args.r_max,
                 num_paths_per_atom=args.num_paths_per_atom,

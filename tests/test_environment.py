@@ -10,7 +10,7 @@ from molgym.rl import DiscreteMolecularEnvironment, SparseInteractionReward
 def test_addition():
     reward_fn = SparseInteractionReward()
     z_table = AtomicNumberTable(zs=[0, 1, 6, 8])
-    terminal_state = data.get_state_from_atoms(atoms=Atoms('H2CO'), z_table=z_table)
+    terminal_state = data.state_from_atoms(atoms=Atoms('H2CO'), z_table=z_table)
     initial_state = data.rewind_state(terminal_state, index=0)
     env = DiscreteMolecularEnvironment(reward_fn=reward_fn, initial_state=initial_state, z_table=z_table)
 
@@ -33,7 +33,7 @@ def test_addition():
 def test_solo_distance():
     reward_fn = SparseInteractionReward()
     z_table = AtomicNumberTable(zs=[0, 1])
-    terminal_state = data.get_state_from_atoms(atoms=Atoms('H2'), z_table=z_table)
+    terminal_state = data.state_from_atoms(atoms=Atoms('H2'), z_table=z_table)
     initial_state = data.rewind_state(terminal_state, index=0)
     env = DiscreteMolecularEnvironment(reward_fn=reward_fn, initial_state=initial_state, z_table=z_table)
 

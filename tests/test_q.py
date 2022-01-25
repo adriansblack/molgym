@@ -12,7 +12,7 @@ resources_path = pkg_resources.resource_filename(__package__, 'resources')
 def test_q():
     atoms = ase.io.read(filename=os.path.join(resources_path, 'h2o.xyz'), format='xyz', index=0)
     z_table = data.AtomicNumberTable([0, 1, 6, 8])
-    terminal_state = data.get_state_from_atoms(atoms=atoms, z_table=z_table)
+    terminal_state = data.state_from_atoms(atoms=atoms, z_table=z_table)
     tau = data.generate_sparse_reward_trajectory(terminal_state, final_reward=1.0)
 
     cutoff = 1.7

@@ -26,6 +26,14 @@ def bag_from_atomic_numbers(zs: Iterable[int], z_table: AtomicNumberTable) -> Ba
     return np.array(bag, dtype=int)
 
 
+def bag_from_atomic_numbers_dict(z_dict: Dict[int, int], z_table: AtomicNumberTable) -> Bag:
+    bag = [0] * len(z_table)
+    for z, value in z_dict.items():
+        bag[z_table.z_to_index(z)] = value
+
+    return np.array(bag, dtype=int)
+
+
 def remove_element_from_bag(e: int, bag: Bag) -> Bag:
     if bag[e] < 1:
         raise ValueError(f"Cannot remove element with index '{e}' from '{bag}'")
@@ -109,6 +117,23 @@ def state_to_atoms(state: State, z_table: AtomicNumberTable, info: Optional[Dict
     )
 
 
+def state_from_atoms(atoms: ase.Atoms, z_table: AtomicNumberTable) -> State:
+    if len(atoms) == 0:
+        elements = np.array([0], dtype=int)
+        positions = np.array([[0.0, 0.0, 0.0]], dtype=float)
+    else:
+        elements = np.array([z_table.z_to_index(ase.data.atomic_numbers[s]) for s in atoms.symbols])
+        positions = atoms.positions
+
+    if BAG_KEY in atoms.info:
+        d = {ase.data.atomic_numbers[symbol]: v for symbol, v in atoms.info[BAG_KEY].items()}
+        bag = bag_from_atomic_numbers_dict(d, z_table=z_table)
+    else:
+        bag = bag_from_atomic_numbers(zs=[0], z_table=z_table)
+
+    return State(elements, positions, bag)
+
+
 def get_action(
     state: State,
     element: int,
@@ -137,18 +162,6 @@ def get_action(
     )
 
 
-def get_state_from_atoms(atoms: ase.Atoms, z_table: AtomicNumberTable) -> State:
-    if len(atoms) == 0:
-        elements = np.array([0], dtype=int)
-        positions = np.array([[0.0, 0.0, 0.0]], dtype=float)
-    else:
-        elements = np.array([z_table.z_to_index(ase.data.atomic_numbers[s]) for s in atoms.symbols])
-        positions = atoms.positions
-
-    bag = bag_from_atomic_numbers(zs=[0], z_table=z_table)
-    return State(elements, positions, bag)
-
-
 def rewind_state(s: State, index: int) -> State:
     if index == 0:
         elements = np.array([0], dtype=int)
@@ -171,16 +184,19 @@ def rewind_state(s: State, index: int) -> State:
 def generate_sparse_reward_trajectory(
     terminal_state: State,
     final_reward: float,
+    start_index: int = 0,
     focuses: Optional[List[Optional[int]]] = None,
 ) -> Trajectory:
+    assert 0 <= start_index <= len(terminal_state.elements)
+
     if focuses is None:
-        focuses = [None] * len(terminal_state.elements)
+        focuses = [None] * (len(terminal_state.elements) - start_index)
     else:
-        assert len(terminal_state.elements) == len(focuses)
+        assert len(terminal_state.elements) - start_index == len(focuses)
 
     tau = []
-    state = rewind_state(terminal_state, index=0)
-    for i, focus in enumerate(focuses):
+    state = rewind_state(terminal_state, index=start_index)
+    for i, focus in zip(range(start_index, len(terminal_state.elements)), focuses):
         action = get_action(
             state=state,
             focus=focus,

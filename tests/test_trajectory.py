@@ -84,9 +84,10 @@ def test_breadth_first_rollout(ethanol: ase.Atoms):
 def test_rollout(ethanol):
     z_table = data.AtomicNumberTable([0, 1, 6, 8])
 
-    terminal_state = data.get_state_from_atoms(ethanol, z_table)
-    state = data.rewind_state(terminal_state, index=0)
-    for sars in generate_sparse_reward_trajectory(terminal_state, final_reward=0.0):
+    terminal_state = data.state_from_atoms(ethanol, z_table)
+    tau = generate_sparse_reward_trajectory(terminal_state, final_reward=0.0)
+    state = tau[0].state
+    for sars in tau:
         state = propagate(state, sars.action)
     atoms = state_to_atoms(state, z_table)
 
@@ -98,7 +99,7 @@ def test_rollout(ethanol):
 
 def test_trajectory_generation(ethanol):
     z_table = data.AtomicNumberTable([0, 1, 6, 8])
-    terminal_state = data.get_state_from_atoms(ethanol, z_table)
+    terminal_state = data.state_from_atoms(ethanol, z_table)
     trajectory = generate_sparse_reward_trajectory(terminal_state, final_reward=1.5)
 
     assert all(not sars.done for sars in trajectory[:-1])
@@ -110,6 +111,23 @@ def test_trajectory_generation(ethanol):
     sars_first = trajectory[0]
     assert len(sars_first.state.elements) == 1  # if canvas is empty, it contains a fake atom
     assert sum(sars_first.state.bag) == len(ethanol)  # bag is full
+
+    sars_last = trajectory[-1]
+    assert len(sars_last.state.elements) == len(ethanol) - 1  # canvas close to full
+    assert sum(sars_last.state.bag) == 1  # one atom remaining
+    assert len(sars_last.next_state.elements) == len(ethanol)  # canvas is full
+    assert (sum(sars_last.next_state.bag) == 1
+            and sars_last.next_state.bag[0] == 1)  # no real atoms remaining, only sentinel
+
+
+def test_non_empty_initial_trajectory_generation(ethanol):
+    z_table = data.AtomicNumberTable([0, 1, 6, 8])
+    terminal_state = data.state_from_atoms(ethanol, z_table)
+    trajectory = generate_sparse_reward_trajectory(terminal_state, final_reward=1.5, start_index=len(ethanol) - 1)
+
+    assert len(trajectory) == 1
+    assert trajectory[-1].done
+    assert np.isclose(trajectory[-1].reward, 1.5)
 
     sars_last = trajectory[-1]
     assert len(sars_last.state.elements) == len(ethanol) - 1  # canvas close to full
@@ -132,7 +150,7 @@ def test_propagate():
 
 def test_data_loader(ethanol):
     z_table = data.AtomicNumberTable([0, 1, 6, 8])
-    terminal_state = data.get_state_from_atoms(ethanol, z_table)
+    terminal_state = data.state_from_atoms(ethanol, z_table)
     sars_list = generate_sparse_reward_trajectory(terminal_state, final_reward=1.0)
     batch_size = 5
 
@@ -171,7 +189,7 @@ def test_data_loader(ethanol):
 def test_batch_propagate(ethanol):
     cutoff = 1.7
     z_table = data.AtomicNumberTable([0, 1, 6, 8])
-    terminal_state = data.get_state_from_atoms(ethanol, z_table)
+    terminal_state = data.state_from_atoms(ethanol, z_table)
     sars_list = generate_sparse_reward_trajectory(terminal_state, final_reward=1.0)
     loader = data.DataLoader(
         dataset=[data.process_sars(sars=sars, cutoff=cutoff) for sars in sars_list],

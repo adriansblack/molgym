@@ -233,7 +233,7 @@ def main():
 
     focuses = atoms.info.get('focuses', None)
     assert len(focuses) == len(atoms) if focuses is not None else True
-    terminal_state = data.get_state_from_atoms(atoms, z_table)
+    terminal_state = data.state_from_atoms(atoms, z_table)
     sars_list = data.generate_sparse_reward_trajectory(terminal_state, final_reward=0.0, focuses=focuses)
 
     data_loader = data.DataLoader(
