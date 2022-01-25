@@ -92,21 +92,3 @@ def breadth_first_rollout(graph: nx.Graph, seed: int, visited: Optional[Sequence
 
     assert len(visited) == len(graph)
     return visited
-
-
-def random_neighbor_rollout(graph: nx.Graph, seed: int) -> Sequence[int]:
-    rng = np.random.default_rng(seed)
-    start_index = int(rng.choice(graph.nodes))  # cast to int as choice() returns numpy.int64
-    visited = [start_index]
-    next_nodes = [start_index]
-
-    while len(next_nodes) > 0:
-        node = rng.choice(next_nodes)
-        next_nodes.remove(node)
-        for neighbor in graph.neighbors(node):
-            if neighbor not in visited:
-                visited.append(neighbor)
-                next_nodes.append(neighbor)
-
-    assert len(visited) == len(graph)
-    return visited
