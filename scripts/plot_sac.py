@@ -107,6 +107,13 @@ def group_by_name(tuples: List[Tuple[str, int, str]]) -> DefaultDict[str, List[T
     return d
 
 
+def plot_episode_length(ax: plt.Axes, df: pd.DataFrame, min_iter: int, max_iter: int, name: str):
+    df = df.groupby(['iteration']).agg(['mean', 'std']).reset_index()
+    df = df[(min_iter <= df['iteration']) & (df['iteration'] <= max_iter)]
+
+    ax.plot(df['iteration'], df['length']['mean'], zorder=1, label=name)
+
+
 def analyse_and_plot_data(name: str, tuples: List[Tuple[int, str]], min_iter: int, max_iter: int) -> None:
     print(f"Parsing paths for '{name}': " + str([path for counter, path in tuples]))
 
@@ -115,13 +122,12 @@ def analyse_and_plot_data(name: str, tuples: List[Tuple[int, str]], min_iter: in
     opt_df = pd.concat([generate_opt_df(parse_results(path, 'opt'), seed=seed) for (seed, path) in tuples])
 
     # Plot
-    fig, axes = plt.subplots(ncols=3, nrows=1, figsize=(3 * fig_width, fig_height), constrained_layout=True)
+    fig, axes = plt.subplots(ncols=4, nrows=1, figsize=(4 * fig_width, fig_height), constrained_layout=True)
 
     # Rollouts
     ax = axes[0]
     plot_rollouts(ax, train_df, min_iter=min_iter, max_iter=max_iter, name='train')
     plot_rollouts(ax, eval_df, min_iter=min_iter, max_iter=max_iter, name='eval')
-
     ax.set_xlabel('Iteration')
     ax.set_ylabel('Return')
     ax.legend()
@@ -138,6 +144,13 @@ def analyse_and_plot_data(name: str, tuples: List[Tuple[int, str]], min_iter: in
     plot_gradients(ax, opt_df, min_iter=min_iter, max_iter=max_iter)
     ax.set_xlabel('Epoch')
     ax.set_ylabel('Gradient Norm')
+    ax.legend()
+
+    ax = axes[3]
+    plot_episode_length(ax, train_df, min_iter=min_iter, max_iter=max_iter, name='train')
+    plot_episode_length(ax, eval_df, min_iter=min_iter, max_iter=max_iter, name='eval')
+    ax.set_xlabel('Iteration')
+    ax.set_ylabel('Episode Length')
     ax.legend()
 
     fig.savefig(f'training_{name}.pdf')
