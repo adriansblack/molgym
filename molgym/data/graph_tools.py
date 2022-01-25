@@ -71,7 +71,7 @@ def breadth_first_rollout(graph: nx.Graph, seed: int, visited: Optional[Sequence
     rng = np.random.default_rng(seed)
     node_queue: queue.SimpleQueue[int] = queue.SimpleQueue()
 
-    if visited is None:
+    if visited is None or len(visited) == 0:
         start_index = int(rng.choice(graph.nodes))  # cast to int as choice() returns numpy.int64
         visited = [start_index]
         node_queue.put(start_index)
