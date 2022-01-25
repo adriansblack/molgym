@@ -4,12 +4,13 @@ import io
 import ase.build
 import ase.data
 import ase.io
+import networkx as nx
 import numpy as np
 import pytest
 import torch
 
 from molgym import data, tools
-from molgym.data.graph_tools import generate_topology
+from molgym.data.graph_tools import generate_topology, breadth_first_rollout
 from molgym.data.trajectory import (Action, generate_sparse_reward_trajectory, propagate, State, state_to_atoms)
 
 
@@ -64,6 +65,20 @@ def test_graph(ethanol):
 def test_disjoint_graph(ethanol):
     with pytest.raises(AssertionError):
         generate_topology(ethanol.positions, cutoff_distance=1.0)
+
+
+def test_breadth_first_rollout(ethanol: ase.Atoms):
+    graph = generate_topology(ethanol.positions, cutoff_distance=1.6)
+    sequence = breadth_first_rollout(graph, seed=1, visited=[0, 1, 2])
+
+    assert sequence[:3] == [0, 1, 2]
+    assert frozenset(sequence) == frozenset(graph)
+
+    with pytest.raises(nx.NetworkXError):
+        breadth_first_rollout(graph, seed=1, visited=[-1])
+
+    with pytest.raises(nx.NetworkXError):
+        breadth_first_rollout(graph, seed=1, visited=[0, 1, len(ethanol) + 1])
 
 
 def test_rollout(ethanol):
