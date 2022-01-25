@@ -76,7 +76,7 @@ def breadth_first_rollout(graph: nx.Graph, seed: int, visited: Optional[Sequence
         visited = [start_index]
         node_queue.put(start_index)
     else:
-        visited = copy.copy(visited)
+        visited = copy.copy(list(visited))
         rng.shuffle(visited)
         for node in visited:
             node_queue.put(node)
