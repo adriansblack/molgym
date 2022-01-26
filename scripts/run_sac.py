@@ -121,6 +121,7 @@ def main() -> None:
     highest_return = -np.inf
     dataset = []
     trajectory_lengths = []
+    total_num_episodes = 0
     for i in range(args.num_iters):
         logging.info(f'Iteration {i}')
 
@@ -137,11 +138,13 @@ def main() -> None:
             training=True,
             device=device,
         )
+        total_num_episodes += len(new_trajectories)
 
         # Analyze trajectories
         logging.debug('Analyzing trajectories')
         tau_info: Dict[str, Any] = data.analyze_trajectories(new_trajectories)
         tau_info['iteration'] = i
+        tau_info['total_num_episodes'] = total_num_episodes
         tau_info['kind'] = 'train'
         logger.log(tau_info)
 
@@ -195,6 +198,7 @@ def main() -> None:
             'progress': info,
             'kind': 'opt',
             'iteration': i,
+            'total_num_episodes': total_num_episodes,
         }
         logger.log(train_info)
 
@@ -213,6 +217,7 @@ def main() -> None:
             )
             tau_eval: Dict[str, Any] = data.analyze_trajectories(eval_trajectories)
             tau_eval['iteration'] = i
+            tau_eval['total_num_episodes'] = total_num_episodes
             tau_eval['kind'] = 'eval'
             logger.log(tau_eval)
             logging.info(f'eval_return={tau_eval["return"]:.3f}')
