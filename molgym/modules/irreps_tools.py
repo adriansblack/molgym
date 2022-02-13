@@ -59,6 +59,7 @@ def get_merge_instructions(irreps1: o3.Irreps, irreps2: o3.Irreps, irreps_out: o
         for j, (_, ir_edge) in enumerate(irreps2):
             for ir_out in ir_in * ir_edge:  # | l1 - l2 | <= l <= l1 + l2
                 if ir_out in irreps_out:
+                    # TODO: check uvw
                     instructions.append((i, j, index[ir_out], 'uvw', trainable))
 
     return instructions

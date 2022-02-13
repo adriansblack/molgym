@@ -1,11 +1,13 @@
 import argparse
+import dataclasses
 import logging
 import os
 from typing import Any, Dict, List
 
 import ase
-import ase.io
 import ase.data
+import ase.io
+import networkx as nx
 import numpy as np
 import torch
 from e3nn import o3
@@ -21,26 +23,34 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     return parser
 
 
+@dataclasses.dataclass
+class EndPoint:
+    state: data.State
+    start_index: int
+    reward: float
+
+
 def create_trajectories(
-    terminal_state: data.State,
-    start_index: int,
-    final_reward: float,
+    end_point: EndPoint,
     cutoff: float,
-    num_paths_per_atom: float,
+    num_paths: int,
     seed: int,
 ) -> List[data.Trajectory]:
-    graph = data.graph_tools.generate_topology(terminal_state.positions, cutoff_distance=cutoff)
-    num_paths = int(num_paths_per_atom * len(terminal_state.elements))
+    graph = data.graph_tools.generate_topology(end_point.state.positions, cutoff_distance=cutoff)
+    if not nx.is_connected(graph):
+        return []
 
     taus: List[data.Trajectory] = []
     for i in range(num_paths):
-        sequence = data.graph_tools.breadth_first_rollout(graph, seed=seed + i, visited=list(range(start_index)))
+        sequence = data.graph_tools.breadth_first_rollout(graph,
+                                                          seed=seed + i,
+                                                          visited=list(range(end_point.start_index)))
         tau = data.generate_sparse_reward_trajectory(
-            terminal_state=data.State(elements=terminal_state.elements[sequence],
-                                      positions=terminal_state.positions[sequence],
-                                      bag=terminal_state.bag),
-            final_reward=final_reward,
-            start_index=start_index,
+            terminal_state=data.State(elements=end_point.state.elements[sequence],
+                                      positions=end_point.state.positions[sequence],
+                                      bag=end_point.state.bag),
+            final_reward=end_point.reward,
+            start_index=end_point.start_index,
         )
         taus.append(tau)
 
@@ -128,7 +138,7 @@ def main() -> None:
         # Collect data
         num_episodes = args.num_episodes_per_iter if i > 0 else args.num_initial_episodes
         logging.debug(f'Rollout with {num_episodes} episodes')
-        new_trajectories = rl.rollout(
+        new_taus = rl.rollout(
             agent=agent,
             envs=envs,
             num_steps=None,
@@ -138,40 +148,76 @@ def main() -> None:
             training=True,
             device=device,
         )
-        total_num_episodes += len(new_trajectories)
 
         # Analyze trajectories
         logging.debug('Analyzing trajectories')
-        tau_info: Dict[str, Any] = data.analyze_trajectories(new_trajectories)
+        tau_info: Dict[str, Any] = data.analyze_trajectories(new_taus)
+        tau_info['iteration'] = i
+        tau_info['total_num_episodes'] = total_num_episodes
+        tau_info['kind'] = 'rollout'
+        logger.log(tau_info)
+
+        # Structure optimization
+        if args.max_opt_iters > 0:
+            logging.debug('Optimizing trajectories')
+            end_points = []
+            for tau in new_taus:
+                terminal_state = tau[-1].next_state
+                configs, _success = rl.optimize_structure(
+                    reward_fn=reward_fn,
+                    zs=np.array([z_table.index_to_z(i) for i in terminal_state.elements]),
+                    positions=terminal_state.positions,
+                    max_iter=args.max_opt_iters,
+                )
+                end_points += [
+                    EndPoint(
+                        state=data.State(
+                            elements=np.array([z_table.z_to_index(z) for z in config.zs], dtype=int),
+                            positions=config.positions,
+                            bag=terminal_state.bag,
+                        ),
+                        start_index=len(tau[0].state.elements) if tau[0].state.elements[0] != 0 else 0,
+                        reward=config.reward,
+                    ) for config in configs
+                ]
+                total_num_episodes += len(configs)
+        else:
+            end_points = [
+                EndPoint(
+                    state=tau[-1].next_state,
+                    start_index=len(tau[0].state.elements) if tau[0].state.elements[0] != 0 else 0,
+                    reward=tau[-1].reward,
+                ) for tau in new_taus
+            ]
+            total_num_episodes += len(new_taus)
+
+        # Generate new trajectories from EndPoints
+        generated_trajectories = []
+        for end_point in end_points:
+            # Check if episode was terminated by environment
+            if end_point.reward <= args.min_reward:
+                continue
+
+            generated_trajectories += create_trajectories(
+                end_point=end_point,
+                cutoff=args.r_max,
+                num_paths=max(int(args.num_paths_per_atom * len(end_point.state.elements)), 1),
+                seed=args.seed,
+            )
+        new_taus = generated_trajectories
+
+        logging.debug('Analyzing generated trajectories')
+        tau_info: Dict[str, Any] = data.analyze_trajectories(new_taus)
         tau_info['iteration'] = i
         tau_info['total_num_episodes'] = total_num_episodes
         tau_info['kind'] = 'train'
         logger.log(tau_info)
 
-        # Create new trajectories
-        generated_trajectories = []
-        for new_trajectory in new_trajectories:
-            # Check if episode was terminated by environment
-            if new_trajectory[-1].reward <= args.min_reward:
-                continue
-
-            first_state = new_trajectory[0].state
-            generated_trajectories += create_trajectories(
-                terminal_state=new_trajectory[-1].next_state,
-                # make sure the first atom is not a dummy atom
-                start_index=len(first_state.elements) if first_state.elements[0] != 0 else 0,
-                final_reward=new_trajectory[-1].reward,
-                cutoff=args.r_max,
-                num_paths_per_atom=args.num_paths_per_atom,
-                seed=args.seed,
-            )
-        new_trajectories += generated_trajectories
-
         # Update buffer
-        trajectory_lengths += [len(tau) for tau in new_trajectories]
+        trajectory_lengths += [len(tau) for tau in new_taus]
         if args.max_num_episodes is not None:
             trajectory_lengths = trajectory_lengths[-args.max_num_episodes:]
-        dataset += [data.process_sars(sars=sars, cutoff=args.d_max) for tau in new_trajectories for sars in tau]
+        dataset += [data.process_sars(sars=sars, cutoff=args.d_max) for tau in new_taus for sars in tau]
         dataset = dataset[-sum(trajectory_lengths):]
 
         logging.debug(f'Preparing dataloader with {len(dataset)} steps')

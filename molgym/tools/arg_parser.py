@@ -72,6 +72,7 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
                         type=float,
                         default=0.995)
     parser.add_argument('--min_reward', help='minimal reward', type=float, default=-0.6)
+    parser.add_argument('--max_opt_iters', help='maximum number of optimization iterations', type=int, default=0)
 
     return parser
 

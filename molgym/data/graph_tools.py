@@ -60,10 +60,9 @@ def generate_topology(
         cutoff_distance: float,  # Angstrom
 ) -> nx.Graph:
     edge_index, _shifts = get_neighborhood(positions=positions, cutoff=cutoff_distance, pbc=None)
-    graph = nx.from_edgelist(edge_index.transpose())
-
-    assert nx.is_connected(graph)
-    assert len(graph) == positions.shape[0]
+    graph = nx.Graph()
+    graph.add_nodes_from(range(positions.shape[0]))
+    graph.add_edges_from(edge_index.transpose())
     return graph
 
 

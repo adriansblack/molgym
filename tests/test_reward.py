@@ -1,17 +1,22 @@
 import numpy as np
 from ase import Atoms
 
-from molgym.rl.reward import SparseInteractionReward
+from molgym import rl
 
 
 def test_calculation():
-    reward_fn = SparseInteractionReward()
-    reward, _ = reward_fn.calculate(Atoms('H'))
+    reward_fn = rl.SparseInteractionReward()
+    atoms = Atoms('H')
+    reward, info = reward_fn.calculate(atoms.get_atomic_numbers(), atoms.positions, gradients=False)
+
     assert np.isclose(reward, 0.0)
+    assert 'gradients' not in info
 
 
 def test_h2():
     atoms = Atoms('HH', positions=[(0, 0, 0), (1, 0, 0)])
-    reward_fn = SparseInteractionReward()
-    reward, _ = reward_fn.calculate(atoms)
+    reward_fn = rl.SparseInteractionReward()
+    reward, info = reward_fn.calculate(zs=atoms.get_atomic_numbers(), positions=atoms.positions, gradients=True)
+
     assert np.isclose(reward, 0.1696435)
+    assert info['gradients'] is not None

@@ -113,8 +113,9 @@ class DiscreteMolecularEnvironment(MolecularEnvironment):
         return True
 
     def _calculate_reward(self, state: State) -> Tuple[float, dict]:
-        atoms = data.state_to_atoms(state, self.z_table)
-        return self.reward_fn.calculate(atoms)
+        return self.reward_fn.calculate(zs=np.array([self.z_table.index_to_z(e) for e in state.elements]),
+                                        positions=state.positions,
+                                        gradients=False)
 
     def _last_covered(self, state: State) -> bool:
         # Ensure that certain atoms are not too far away from the nearest heavy atom to avoid H2, F2,... formation

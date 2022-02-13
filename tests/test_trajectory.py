@@ -63,8 +63,8 @@ def test_graph(ethanol):
 
 
 def test_disjoint_graph(ethanol):
-    with pytest.raises(AssertionError):
-        generate_topology(ethanol.positions, cutoff_distance=1.0)
+    graph = generate_topology(ethanol.positions, cutoff_distance=1.0)
+    assert not nx.is_connected(graph)
 
 
 def test_breadth_first_rollout(ethanol: ase.Atoms):

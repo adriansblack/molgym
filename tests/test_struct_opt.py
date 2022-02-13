@@ -2,9 +2,8 @@ import ase.data
 import numpy as np
 import pytest
 from ase import Atoms
-from molgym import tools
 
-from molgym.rl.calculator import Sparrow
+from molgym import rl
 
 
 @pytest.fixture
@@ -28,45 +27,29 @@ def spin_multiplicity() -> int:
 
 
 def test_minimize(atoms, charge, spin_multiplicity):
-    calculator = Sparrow('PM6')
+    reward_fn = rl.SparseInteractionReward()
+    zs = np.array([ase.data.atomic_numbers[s] for s in atoms.symbols])
 
-    calculator.set_elements(list(atoms.symbols))
-    calculator.set_positions(atoms.positions)
-    calculator.set_settings({'molecular_charge': charge, 'spin_multiplicity': spin_multiplicity})
-    energy1 = calculator.calculate_energy()
-    gradients1 = calculator.calculate_gradients()
+    reward1, info1 = reward_fn.calculate(zs, atoms.positions, gradients=True)
 
-    configs, success = tools.minimize(
-        calculator=calculator,
-        atomic_numbers=np.array([ase.data.atomic_numbers[s] for s in atoms.symbols]),
-        positions=atoms.positions,
-        charge=charge,
-        spin_multiplicity=spin_multiplicity,
-    )
-
+    configs, success = rl.optimize_structure(reward_fn=reward_fn, zs=zs, positions=atoms.positions)
     assert success
 
-    calculator.set_positions(configs[-1].positions)
-    energy2 = calculator.calculate_energy()
-    gradients2 = calculator.calculate_gradients()
+    reward2, info2 = reward_fn.calculate(zs, configs[-1].positions, gradients=True)
 
-    assert energy1 > energy2
-    assert np.sum(np.square(gradients1)) > np.sum(np.square(gradients2))
-    assert np.all(gradients2 < 1E-3)
+    assert reward2 > reward1
+    assert np.sum(np.square(info1['gradients'])) > np.sum(np.square(info2['gradients']))
+    assert np.all(info2['gradients'] < 1E-3)
 
 
 def test_minimize_fail(atoms, charge, spin_multiplicity):
-    calculator = Sparrow('PM6')
-    calculator.set_elements(list(atoms.symbols))
-    calculator.set_positions(atoms.positions)
-    calculator.set_settings({'molecular_charge': charge, 'spin_multiplicity': spin_multiplicity})
+    reward_fn = rl.SparseInteractionReward()
+    zs = np.array([ase.data.atomic_numbers[s] for s in atoms.symbols])
 
-    _configs, success = tools.minimize(
-        calculator=calculator,
-        atomic_numbers=np.array([ase.data.atomic_numbers[s] for s in atoms.symbols]),
+    _configs, success = rl.optimize_structure(
+        reward_fn=reward_fn,
+        zs=zs,
         positions=atoms.positions,
-        charge=charge,
-        spin_multiplicity=spin_multiplicity,
         max_iter=1,
     )
 
@@ -74,18 +57,13 @@ def test_minimize_fail(atoms, charge, spin_multiplicity):
 
 
 def test_minimize_fixed(atoms, charge, spin_multiplicity):
-    calculator = Sparrow('PM6')
+    reward_fn = rl.SparseInteractionReward()
+    zs = np.array([ase.data.atomic_numbers[s] for s in atoms.symbols])
 
-    calculator.set_elements(list(atoms.symbols))
-    calculator.set_positions(atoms.positions)
-    calculator.set_settings({'molecular_charge': charge, 'spin_multiplicity': spin_multiplicity})
-
-    configs, success = tools.minimize(
-        calculator=calculator,
-        atomic_numbers=np.array([ase.data.atomic_numbers[s] for s in atoms.symbols]),
+    configs, success = rl.optimize_structure(
+        reward_fn=reward_fn,
+        zs=zs,
         positions=atoms.positions,
-        charge=charge,
-        spin_multiplicity=spin_multiplicity,
         fixed=[False, False, True],
     )
 
