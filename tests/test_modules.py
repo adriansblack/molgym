@@ -3,12 +3,12 @@ import torch
 import torch_geometric
 import torch_scatter
 
-from molgym.data import Configuration, AtomicNumberTable, geometrize_config
+from molgym.data import Configuration, SymbolTable, geometrize_config
 from molgym.modules import PolynomialCutoff, AtomicEnergiesBlock, BesselBasis
 from molgym.tools import to_numpy
 
 config = Configuration(
-    atomic_numbers=np.array([8, 1, 1]),
+    symbols='OHH',
     positions=np.array([
         [0.0, -2.0, 0.0],
         [1.0, 0.0, 0.0],
@@ -22,7 +22,7 @@ config = Configuration(
     energy=-1.5,
 )
 
-table = AtomicNumberTable([0, 1, 8])
+table = SymbolTable('XHO')
 
 
 def test_bessel_basis():
@@ -42,7 +42,7 @@ def test_polynomial_cutoff():
 def test_atomic_energies():
     energies_block = AtomicEnergiesBlock(atomic_energies=np.array([0.0, 1.0, 3.0]))
 
-    data = geometrize_config(config, z_table=table, cutoff=3.0)
+    data = geometrize_config(config, s_table=table, cutoff=3.0)
     data_loader = torch_geometric.loader.DataLoader([data, data], batch_size=2)
     batch = next(iter(data_loader))
 

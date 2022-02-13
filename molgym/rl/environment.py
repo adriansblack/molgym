@@ -2,11 +2,10 @@ import abc
 import logging
 from typing import Tuple, List
 
-import ase.data
 import numpy as np
 
 from molgym import data
-from molgym.data import Action, State, AtomicNumberTable
+from molgym.data import Action, State, SymbolTable
 from .reward import SparseInteractionReward
 
 
@@ -39,22 +38,21 @@ class DiscreteMolecularEnvironment(MolecularEnvironment):
             self,
             reward_fn: SparseInteractionReward,
             initial_state: State,
-            z_table: AtomicNumberTable,
+            s_table: SymbolTable,
             min_atomic_distance=0.6,  # Angstrom
             max_solo_distance=2.0,  # Angstrom
             min_reward=-0.6,  # Hartree
     ):
         self.reward_fn = reward_fn
         self.initial_state = initial_state
-        self.z_table = z_table
+        self.s_table = s_table
 
         self.min_atomic_distance = min_atomic_distance
         self.max_solo_distance = max_solo_distance
         self.min_reward = min_reward
 
         self.candidate_elements = [
-            self.z_table.z_to_index(ase.data.atomic_numbers[s]) for s in ['H', 'F', 'Cl', 'Br']
-            if ase.data.atomic_numbers[s] in self.z_table.zs
+            self.s_table.symbol_to_element(s) for s in ['H', 'F', 'Cl', 'Br'] if s in self.s_table.symbols
         ]
 
         self.current_state = self.initial_state
@@ -113,7 +111,7 @@ class DiscreteMolecularEnvironment(MolecularEnvironment):
         return True
 
     def _calculate_reward(self, state: State) -> Tuple[float, dict]:
-        return self.reward_fn.calculate(zs=np.array([self.z_table.index_to_z(e) for e in state.elements]),
+        return self.reward_fn.calculate(symbols=[self.s_table.element_to_symbol(e) for e in state.elements],
                                         positions=state.positions,
                                         gradients=False)
 

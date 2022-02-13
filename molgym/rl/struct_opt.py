@@ -5,29 +5,29 @@ import numpy as np
 import scipy.constants
 import scipy.optimize
 
+from molgym.data import Positions, Symbols
 from . import reward
 
 
 @dataclasses.dataclass
 class Configuration:
-    zs: np.ndarray
-    positions: np.ndarray
+    symbols: Symbols
+    positions: Positions
     reward: float
     gradients: np.ndarray
 
 
 def optimize_structure(
     reward_fn: reward.MolecularReward,
-    zs: np.ndarray,
-    positions: np.ndarray,
+    symbols: Symbols,
+    positions: Positions,
     max_iter=120,  # this is not the same as the number of functions calls!
     fixed: Optional[List[bool]] = None,
     verbose=False,
 ) -> Tuple[List[Configuration], bool]:
     assert len(positions.shape) == 2
     assert positions.shape[1] == 3
-    assert len(zs.shape) == 1
-    assert positions.shape[0] == zs.shape[0]
+    assert positions.shape[0] == len(symbols)
     assert fixed is None or len(fixed) == positions.shape[0]
 
     if fixed is not None:
@@ -40,11 +40,11 @@ def optimize_structure(
 
     def function(coords: np.ndarray) -> Tuple[float, np.ndarray]:
         current_positions = coords.reshape(-1, 3)
-        r, info = reward_fn.calculate(zs, current_positions, gradients=True)
+        r, info = reward_fn.calculate(symbols, current_positions, gradients=True)
         gradients = info['gradients']
 
         configs.append(Configuration(
-            zs=zs,
+            symbols=symbols,
             positions=current_positions,
             reward=r,
             gradients=gradients,

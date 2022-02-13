@@ -16,7 +16,7 @@ from molgym import tools, data, rl
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
-    parser.add_argument('--zs', help='atomic numbers (e.g.: 1,6,7,8)', type=str, required=True)
+    parser.add_argument('--symbols', help='symbols (e.g.: XHCO, X is required)', type=str, required=True)
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--bag', help='chemical formula of initial state (e.g.: H2O)', type=str, required=False)
     group.add_argument('--initial_state', help='path to XYZ file', type=str, required=False)
@@ -72,8 +72,8 @@ def main() -> None:
     logger = tools.MetricsLogger(directory=args.log_dir, tag=tag)
 
     # Create Z table
-    z_table = data.AtomicNumberTable(tools.parse_zs(args.zs))
-    logging.info(z_table)
+    s_table = data.SymbolTable(args.symbols)
+    logging.info(s_table)
 
     # Create modules
     agent = rl.SACAgent(
@@ -82,7 +82,7 @@ def main() -> None:
         num_polynomial_cutoff=args.num_cutoff_basis,
         max_ell=args.max_ell,
         num_interactions=args.num_interactions,
-        num_elements=len(z_table),
+        num_elements=len(s_table),
         hidden_irreps=o3.Irreps(args.hidden_irreps),
         network_width=args.network_width,
         num_gaussians=args.num_gaussians,
@@ -110,14 +110,14 @@ def main() -> None:
     reward_fn = rl.SparseInteractionReward()
     if args.initial_state:
         atoms = ase.io.read(args.initial_state, index=0, format='extxyz')
-        initial_state = data.state_from_atoms(atoms, z_table=z_table)
+        initial_state = data.state_from_atoms(atoms, s_table=s_table)
     else:
-        dummy_state = data.state_from_atoms(ase.Atoms(args.bag), z_table=z_table)
+        dummy_state = data.state_from_atoms(ase.Atoms(args.bag), s_table=s_table)
         initial_state = data.rewind_state(dummy_state, 0)
 
     logging.info(f'Initial state: canvas={len(initial_state.elements)} atom(s), bag={initial_state.bag}')
     envs = rl.EnvironmentCollection([
-        rl.DiscreteMolecularEnvironment(reward_fn, initial_state, z_table, min_reward=args.min_reward)
+        rl.DiscreteMolecularEnvironment(reward_fn, initial_state, s_table, min_reward=args.min_reward)
         for _ in range(args.num_envs)
     ])
 
@@ -165,14 +165,14 @@ def main() -> None:
                 terminal_state = tau[-1].next_state
                 configs, _success = rl.optimize_structure(
                     reward_fn=reward_fn,
-                    zs=np.array([z_table.index_to_z(i) for i in terminal_state.elements]),
+                    symbols=[s_table.element_to_symbol(e) for e in terminal_state.elements],
                     positions=terminal_state.positions,
                     max_iter=args.max_opt_iters,
                 )
                 end_points += [
                     EndPoint(
                         state=data.State(
-                            elements=np.array([z_table.z_to_index(z) for z in config.zs], dtype=int),
+                            elements=np.array([s_table.symbol_to_element(s) for s in config.symbols], dtype=int),
                             positions=config.positions,
                             bag=terminal_state.bag,
                         ),
@@ -269,7 +269,7 @@ def main() -> None:
             logging.info(f'eval_return={tau_eval["return"]:.3f}')
 
             terminal_atoms = [
-                data.state_to_atoms(tau[-1].next_state, z_table, info={'reward': tau[-1].reward})
+                data.state_to_atoms(tau[-1].next_state, s_table, info={'reward': tau[-1].reward})
                 for tau in eval_trajectories
             ]
             ase.io.write(os.path.join(args.log_dir, f'terminals_{tag}_{i}.xyz'), images=terminal_atoms, format='extxyz')

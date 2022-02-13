@@ -50,11 +50,6 @@ class StateBatch(torch_geometric.data.Batch, StateData):
     pass
 
 
-def atomic_numbers_to_index_array(atomic_numbers: np.ndarray, z_table: utils.AtomicNumberTable) -> np.ndarray:
-    to_index_fn = np.vectorize(z_table.z_to_index)
-    return to_index_fn(atomic_numbers)
-
-
 def tensorize_canvas(
     elements: np.ndarray,  # [n, ], not Zs but indices
     positions: np.ndarray,  # [n, 3]
@@ -85,17 +80,20 @@ def tensorize_bag(bag: Bag) -> tools.TensorDict:
 
 def geometrize_config(
     config: utils.Configuration,
-    z_table: utils.AtomicNumberTable,
+    s_table: utils.SymbolTable,
     cutoff: float,
 ) -> CanvasData:
-    element_indices = atomic_numbers_to_index_array(config.atomic_numbers, z_table=z_table)
-    info = tensorize_canvas(element_indices, config.positions, cutoff=cutoff, num_classes=len(z_table))
+    elements = np.array([s_table.symbol_to_element(s) for s in config.symbols], dtype=int)
+    info = tensorize_canvas(elements, config.positions, cutoff=cutoff, num_classes=len(s_table))
     return CanvasData(**info)
 
 
 def geometrize_state(state: State, cutoff: float) -> StateData:
     return StateData(
-        **tensorize_canvas(state.elements, state.positions, cutoff=cutoff, num_classes=len(state.bag)),
+        **tensorize_canvas(elements=state.elements,
+                           positions=state.positions,
+                           cutoff=cutoff,
+                           num_classes=len(state.bag)),
         **tensorize_bag(state.bag),
     )
 

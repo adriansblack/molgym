@@ -1,20 +1,21 @@
 import abc
 import time
-from typing import Tuple, Dict, Iterable, Optional, Any
+from typing import Tuple, Dict, Optional, Any
 
 import ase.data
 import numpy as np
 
+from molgym.data import Symbols, Positions
 from .calculator import Sparrow
 
 
-def get_minimum_spin_multiplicity(zs: Iterable[int]) -> int:
-    return sum(zs) % 2 + 1
+def get_minimum_spin_multiplicity(symbols: Symbols) -> int:
+    return sum(ase.data.atomic_numbers[s] for s in symbols) % 2 + 1
 
 
 class MolecularReward(abc.ABC):
     @abc.abstractmethod
-    def calculate(self, zs: np.ndarray, positions: np.ndarray, gradients=False) -> Tuple[float, dict]:
+    def calculate(self, symbols: Symbols, positions: Positions, gradients=False) -> Tuple[float, dict]:
         raise NotImplementedError
 
 
@@ -30,14 +31,14 @@ class SparseInteractionReward(MolecularReward):
             'unrestricted_calculation': 1,
         }
 
-        self.atomic_energies: Dict[int, float] = {}
+        self.atomic_energies: Dict[str, float] = {}
 
-    def calculate(self, zs: np.ndarray, positions: np.ndarray, gradients=False) -> Tuple[float, dict]:
+    def calculate(self, symbols: Symbols, positions: Positions, gradients=False) -> Tuple[float, dict]:
         start = time.time()
         self.calculator = Sparrow('PM6')
 
-        e_tot, grad = self._calculate_properties(zs, positions, gradients=gradients)
-        e_parts = sum(self._calculate_atomic_energy(z) for z in zs)
+        e_tot, grad = self._calculate_properties(symbols, positions, gradients=gradients)
+        e_parts = sum(self._calculate_atomic_energy(s) for s in symbols)
         e_int = e_tot - e_parts
 
         reward = -1 * e_int
@@ -52,27 +53,27 @@ class SparseInteractionReward(MolecularReward):
 
         return reward, info
 
-    def _calculate_atomic_energy(self, z: int) -> float:
-        if z not in self.atomic_energies:
-            self.atomic_energies[z], _forces = self._calculate_properties(
-                zs=np.array([z], dtype=int),
+    def _calculate_atomic_energy(self, s: str) -> float:
+        if s not in self.atomic_energies:
+            self.atomic_energies[s], _forces = self._calculate_properties(
+                symbols=s,
                 positions=np.zeros((1, 3), dtype=float),
                 gradients=False,
             )
-        return self.atomic_energies[z]
+        return self.atomic_energies[s]
 
     def _calculate_properties(
         self,
-        zs: np.ndarray,
-        positions: np.ndarray,
+        symbols: Symbols,
+        positions: Positions,
         gradients: bool,
     ) -> Tuple[float, Optional[np.ndarray]]:
-        if len(zs) == 0:
+        if len(symbols) == 0:
             return 0.0, np.zeros((0, 3), dtype=float) if gradients else None
 
-        self.calculator.set_elements(list(ase.data.chemical_symbols[z] for z in zs))
+        self.calculator.set_elements(list(symbols))
         self.calculator.set_positions(positions)
-        self.settings['spin_multiplicity'] = get_minimum_spin_multiplicity(zs)
+        self.settings['spin_multiplicity'] = get_minimum_spin_multiplicity(symbols)
         self.calculator.set_settings(self.settings)
         energy = self.calculator.calculate_energy()
 

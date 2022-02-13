@@ -82,7 +82,7 @@ def test_breadth_first_rollout(ethanol: ase.Atoms):
 
 
 def test_rollout(ethanol):
-    z_table = data.AtomicNumberTable([0, 1, 6, 8])
+    z_table = data.SymbolTable('XHCO')
 
     terminal_state = data.state_from_atoms(ethanol, z_table)
     tau = generate_sparse_reward_trajectory(terminal_state, final_reward=0.0)
@@ -98,8 +98,8 @@ def test_rollout(ethanol):
 
 
 def test_trajectory_generation(ethanol):
-    z_table = data.AtomicNumberTable([0, 1, 6, 8])
-    terminal_state = data.state_from_atoms(ethanol, z_table)
+    s_table = data.SymbolTable('XHCO')
+    terminal_state = data.state_from_atoms(ethanol, s_table)
     trajectory = generate_sparse_reward_trajectory(terminal_state, final_reward=1.5)
 
     assert all(not sars.done for sars in trajectory[:-1])
@@ -121,8 +121,8 @@ def test_trajectory_generation(ethanol):
 
 
 def test_non_empty_initial_trajectory_generation(ethanol):
-    z_table = data.AtomicNumberTable([0, 1, 6, 8])
-    terminal_state = data.state_from_atoms(ethanol, z_table)
+    s_table = data.SymbolTable('XHCO')
+    terminal_state = data.state_from_atoms(ethanol, s_table)
     trajectory = generate_sparse_reward_trajectory(terminal_state, final_reward=1.5, start_index=len(ethanol) - 1)
 
     assert len(trajectory) == 1
@@ -149,8 +149,8 @@ def test_propagate():
 
 
 def test_data_loader(ethanol):
-    z_table = data.AtomicNumberTable([0, 1, 6, 8])
-    terminal_state = data.state_from_atoms(ethanol, z_table)
+    s_table = data.SymbolTable('XHCO')
+    terminal_state = data.state_from_atoms(ethanol, s_table)
     sars_list = generate_sparse_reward_trajectory(terminal_state, final_reward=1.0)
     batch_size = 5
 
@@ -188,8 +188,8 @@ def test_data_loader(ethanol):
 
 def test_batch_propagate(ethanol):
     cutoff = 1.7
-    z_table = data.AtomicNumberTable([0, 1, 6, 8])
-    terminal_state = data.state_from_atoms(ethanol, z_table)
+    s_table = data.SymbolTable('XHCO')
+    terminal_state = data.state_from_atoms(ethanol, s_table)
     sars_list = generate_sparse_reward_trajectory(terminal_state, final_reward=1.0)
     loader = data.DataLoader(
         dataset=[data.process_sars(sars=sars, cutoff=cutoff) for sars in sars_list],

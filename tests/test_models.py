@@ -5,7 +5,7 @@ from e3nn import o3
 from molgym import data, modules, tools
 
 config = data.Configuration(
-    atomic_numbers=np.array([8, 1, 1]),
+    symbols='OHH',
     positions=np.array([
         [1.1, 0.0, 0.0],
         [0.0, 1.2, 0.0],
@@ -19,7 +19,7 @@ config = data.Configuration(
     energy=-1.5,
 )
 
-table = data.AtomicNumberTable([0, 1, 8])
+s_table = data.SymbolTable('XHO')
 
 
 def test_bo_model():
@@ -29,7 +29,7 @@ def test_bo_model():
         num_bessel=7,
         num_polynomial_cutoff=5,
         max_ell=2,
-        num_elements=len(table),
+        num_elements=len(s_table),
         num_interactions=2,
         atomic_energies=atomic_energies,
         hidden_irreps=o3.Irreps('10x0e + 10x0o + 8x1e + 8x1o + 4x2e + 4x2o'),
@@ -37,7 +37,7 @@ def test_bo_model():
 
     assert tools.count_parameters(model) == 5070
 
-    atomic_data = data.geometrize_config(config, z_table=table, cutoff=3.0)
+    atomic_data = data.geometrize_config(config, s_table=s_table, cutoff=3.0)
     data_loader = torch_geometric.loader.DataLoader([atomic_data, atomic_data], batch_size=2)
     batch = next(iter(data_loader))
 

@@ -4,7 +4,7 @@ from typing import Iterable, Sequence, List, Optional, Dict, Union
 import ase.data
 import numpy as np
 
-from .utils import Elements, Positions, AtomicNumberTable
+from .utils import Labels, Positions, SymbolTable
 
 POSITIONS_KEY = 'positions'
 ELEMENTS_KEY = 'elements'
@@ -18,34 +18,34 @@ ORIENTATION_KEY = 'orientation'
 Bag = np.ndarray
 
 
-def bag_from_atomic_numbers(zs: Iterable[int], z_table: AtomicNumberTable) -> Bag:
-    bag = [0] * len(z_table)
-    for z in zs:
-        bag[z_table.z_to_index(z)] += 1
+def bag_from_symbols(symbols: Iterable[str], s_table: SymbolTable) -> Bag:
+    bag = [0] * len(s_table)
+    for symbol in symbols:
+        bag[s_table.symbol_to_element(symbol)] += 1
 
     return np.array(bag, dtype=int)
 
 
-def bag_from_atomic_numbers_dict(z_dict: Dict[int, int], z_table: AtomicNumberTable) -> Bag:
+def bag_from_symbol_count_dict(symbol_count_dict: Dict[str, int], z_table: SymbolTable) -> Bag:
     bag = [0] * len(z_table)
-    for z, value in z_dict.items():
-        bag[z_table.z_to_index(z)] = value
+    for symbol, count in symbol_count_dict.items():
+        bag[z_table.symbol_to_element(symbol)] = count
 
     return np.array(bag, dtype=int)
 
 
-def remove_element_from_bag(e: int, bag: Bag) -> Bag:
+def remove_atom_from_bag(e: int, bag: Bag) -> Bag:
     if bag[e] < 1:
-        raise ValueError(f"Cannot remove element with index '{e}' from '{bag}'")
+        raise ValueError(f"Cannot remove element (index) '{e}' from '{bag}'")
 
     copy = bag.copy()
     copy[e] -= 1
     return copy
 
 
-def add_element_to_bag(e: int, bag: Bag) -> Bag:
+def add_atom_to_bag(label: int, bag: Bag) -> Bag:
     copy = bag.copy()
-    copy[e] += 1
+    copy[label] += 1
     return copy
 
 
@@ -67,7 +67,7 @@ class Action:
 
 @dataclass
 class State:
-    elements: Elements  # indices, not Zs
+    elements: Labels  # labels (indices), not Zs
     positions: Positions
     bag: Bag
 
@@ -85,11 +85,11 @@ Trajectory = Sequence[SARS]
 
 
 def propagate(state: State, action: Action) -> State:
-    bag = remove_element_from_bag(action.element, state.bag)
+    bag = remove_atom_from_bag(action.element, state.bag)
 
     # If bag is empty, add sentinel element at position 0
     if bag_is_empty(bag):
-        bag = add_element_to_bag(0, bag)
+        bag = add_atom_to_bag(label=0, bag=bag)
 
     if len(state.elements) == 1 and state.elements[0] == 0:
         return State(
@@ -106,32 +106,31 @@ def propagate(state: State, action: Action) -> State:
     )
 
 
-def state_to_atoms(state: State, z_table: AtomicNumberTable, info: Optional[Dict] = None) -> ase.Atoms:
-    d = {BAG_KEY: {ase.data.chemical_symbols[z_table.index_to_z(i)]: int(v) for i, v in enumerate(state.bag)}}
+def state_to_atoms(state: State, s_table: SymbolTable, info: Optional[Dict] = None) -> ase.Atoms:
+    d = {BAG_KEY: {s_table.element_to_symbol(i): int(v) for i, v in enumerate(state.bag)}}
     if info is not None:
         d.update(info)
     return ase.Atoms(
-        symbols=[ase.data.chemical_symbols[z_table.index_to_z(e)] for e in state.elements],
+        symbols=[s_table.element_to_symbol(e) for e in state.elements],
         positions=state.positions,
         info=d,
     )
 
 
-def state_from_atoms(atoms: ase.Atoms, z_table: AtomicNumberTable) -> State:
+def state_from_atoms(atoms: ase.Atoms, s_table: SymbolTable) -> State:
     if len(atoms) == 0:
         elements = np.array([0], dtype=int)
         positions = np.array([[0.0, 0.0, 0.0]], dtype=float)
     else:
-        elements = np.array([z_table.z_to_index(ase.data.atomic_numbers[s]) for s in atoms.symbols])
+        elements = np.array([s_table.symbol_to_element(s) for s in atoms.symbols])
         positions = atoms.positions
 
     if BAG_KEY in atoms.info:
-        d = {ase.data.atomic_numbers[symbol]: v for symbol, v in atoms.info[BAG_KEY].items()}
-        bag = bag_from_atomic_numbers_dict(d, z_table=z_table)
+        bag = bag_from_symbol_count_dict(atoms.info[BAG_KEY].items(), z_table=s_table)
     else:
-        bag = bag_from_atomic_numbers(zs=[0], z_table=z_table)
+        bag = bag_from_symbols(symbols=['X'], s_table=s_table)
 
-    return State(elements, positions, bag)
+    return State(elements=elements, positions=positions, bag=bag)
 
 
 def get_action(
@@ -173,10 +172,10 @@ def rewind_state(s: State, index: int) -> State:
     # Place remaining atoms into bag
     bag = s.bag
     for e in s.elements[index:]:
-        bag = add_element_to_bag(e, bag)
+        bag = add_atom_to_bag(e, bag)
 
     if not no_real_atoms_in_bag(bag) and bag[0] != 0:
-        bag = remove_element_from_bag(0, bag)
+        bag = remove_atom_from_bag(0, bag)
 
     return State(elements, positions, bag)
 

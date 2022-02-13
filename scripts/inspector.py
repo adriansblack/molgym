@@ -228,8 +228,8 @@ def main():
     atoms = ase.io.read(args.xyz, format='extxyz', index=args.index)
 
     # Parse Z table
-    z_table = data.AtomicNumberTable([int(z) for z in args.zs.split(',')])
-    symbols = [ase.data.chemical_symbols[z] for z in z_table.zs]
+    z_table = data.SymbolTable([int(z) for z in args.zs.split(',')])
+    symbols = [ase.data.chemical_symbols[z] for z in z_table.symbols]
 
     focuses = atoms.info.get('focuses', None)
     assert len(focuses) == len(atoms) if focuses is not None else True

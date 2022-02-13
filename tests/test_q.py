@@ -11,8 +11,8 @@ resources_path = pkg_resources.resource_filename(__package__, 'resources')
 
 def test_q():
     atoms = ase.io.read(filename=os.path.join(resources_path, 'h2o.xyz'), format='xyz', index=0)
-    z_table = data.AtomicNumberTable([0, 1, 6, 8])
-    terminal_state = data.state_from_atoms(atoms=atoms, z_table=z_table)
+    s_table = data.SymbolTable('XHCO')
+    terminal_state = data.state_from_atoms(atoms=atoms, s_table=s_table)
     tau = data.generate_sparse_reward_trajectory(terminal_state, final_reward=1.0)
 
     cutoff = 1.7
@@ -22,7 +22,7 @@ def test_q():
         num_polynomial_cutoff=6,
         max_ell=3,
         num_interactions=2,
-        num_elements=len(z_table),
+        num_elements=len(s_table),
         hidden_irreps=o3.Irreps('3x0e + 3x1o + 3x2e + 3x3o'),
         network_width=32,
     )

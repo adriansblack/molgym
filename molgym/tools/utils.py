@@ -14,17 +14,6 @@ def get_tag(name: str, seed: int) -> str:
     return f'{name}_run-{seed}'
 
 
-def parse_zs(zs_str: str) -> List[int]:
-    z_ints = sorted(int(i) for i in zs_str.split(','))
-    assert z_ints[0] >= 0
-
-    # First Z has to be 0
-    if z_ints[0] != 0:
-        z_ints.insert(0, 0)
-
-    return z_ints
-
-
 def setup_logger(level: Union[int, str] = logging.INFO, tag: Optional[str] = None, directory: Optional[str] = None):
     logger = logging.getLogger()
     logger.setLevel(level)

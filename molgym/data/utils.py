@@ -7,15 +7,16 @@ import ase.data
 import ase.io
 import numpy as np
 
-Vector = np.ndarray  # [3,]
-Elements = np.ndarray  # [..., ]
-Positions = np.ndarray  # [..., 3]
-Forces = np.ndarray  # [..., 3]
+Vector = np.ndarray  # [3,] (float)
+Symbols = Sequence[str]  # [..., ] (str)
+Labels = np.ndarray  # [..., ] (int)
+Positions = np.ndarray  # [..., 3] (float)
+Forces = np.ndarray  # [..., 3] (float)
 
 
 @dataclass
 class Configuration:
-    atomic_numbers: np.ndarray
+    symbols: Symbols
     positions: Positions  # Angstrom
     energy: Optional[float] = None  # eV
     forces: Optional[Forces] = None  # eV/Angstrom
@@ -27,8 +28,7 @@ Configurations = List[Configuration]
 def config_from_atoms(atoms: ase.Atoms, energy_key='energy', forces_key='forces') -> Configuration:
     energy = atoms.info.get(energy_key, None)  # eV
     forces = atoms.arrays.get(forces_key, None)  # eV / Ang
-    atomic_numbers = np.array([ase.data.atomic_numbers[symbol] for symbol in atoms.symbols])
-    return Configuration(atomic_numbers=atomic_numbers, positions=atoms.positions, energy=energy, forces=forces)
+    return Configuration(symbols=atoms.symbols, positions=atoms.positions, energy=energy, forces=forces)
 
 
 def load_xyz(path: str, formatting: str = 'extxyz') -> List[ase.Atoms]:
@@ -38,26 +38,26 @@ def load_xyz(path: str, formatting: str = 'extxyz') -> List[ase.Atoms]:
     return atoms_list
 
 
-class AtomicNumberTable:
-    def __init__(self, zs: Sequence[int]):
-        assert zs[0] == 0
-        self.zs = zs
+class SymbolTable:
+    def __init__(self, symbols: Symbols) -> None:
+        assert symbols[0] == 'X'
+        self.symbols = symbols
 
     def __len__(self) -> int:
-        return len(self.zs)
+        return len(self.symbols)
 
-    def __str__(self):
-        return f'{self.__class__.__name__}: {tuple(self.zs)}'
+    def __str__(self) -> str:
+        return f'{self.__class__.__name__}: {tuple(self.symbols)}'
 
-    def index_to_z(self, index: int) -> int:
-        return self.zs[index]
+    def element_to_symbol(self, e: int) -> str:
+        return self.symbols[e]
 
-    def z_to_index(self, atomic_number: int) -> int:
-        return self.zs.index(atomic_number)
+    def symbol_to_element(self, s: str) -> int:
+        return self.symbols.index(s)
 
 
-def get_atomic_number_table_from_zs(zs: Iterable[int]) -> AtomicNumberTable:
-    z_set = set()
+def get_atomic_number_table_from_symbols(zs: Iterable[str]) -> SymbolTable:
+    symbol_set = set()
     for z in zs:
-        z_set.add(z)
-    return AtomicNumberTable(sorted(list(z_set)))
+        symbol_set.add(z)
+    return SymbolTable(sorted(list(symbol_set), key=lambda s: ase.data.atomic_numbers[s]))

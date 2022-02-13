@@ -28,14 +28,13 @@ def spin_multiplicity() -> int:
 
 def test_minimize(atoms, charge, spin_multiplicity):
     reward_fn = rl.SparseInteractionReward()
-    zs = np.array([ase.data.atomic_numbers[s] for s in atoms.symbols])
 
-    reward1, info1 = reward_fn.calculate(zs, atoms.positions, gradients=True)
+    reward1, info1 = reward_fn.calculate(atoms.symbols, atoms.positions, gradients=True)
 
-    configs, success = rl.optimize_structure(reward_fn=reward_fn, zs=zs, positions=atoms.positions)
+    configs, success = rl.optimize_structure(reward_fn=reward_fn, symbols=atoms.symbols, positions=atoms.positions)
     assert success
 
-    reward2, info2 = reward_fn.calculate(zs, configs[-1].positions, gradients=True)
+    reward2, info2 = reward_fn.calculate(configs[-1].symbols, configs[-1].positions, gradients=True)
 
     assert reward2 > reward1
     assert np.sum(np.square(info1['gradients'])) > np.sum(np.square(info2['gradients']))
@@ -44,11 +43,10 @@ def test_minimize(atoms, charge, spin_multiplicity):
 
 def test_minimize_fail(atoms, charge, spin_multiplicity):
     reward_fn = rl.SparseInteractionReward()
-    zs = np.array([ase.data.atomic_numbers[s] for s in atoms.symbols])
 
     _configs, success = rl.optimize_structure(
         reward_fn=reward_fn,
-        zs=zs,
+        symbols=atoms.symbols,
         positions=atoms.positions,
         max_iter=1,
     )
@@ -58,11 +56,10 @@ def test_minimize_fail(atoms, charge, spin_multiplicity):
 
 def test_minimize_fixed(atoms, charge, spin_multiplicity):
     reward_fn = rl.SparseInteractionReward()
-    zs = np.array([ase.data.atomic_numbers[s] for s in atoms.symbols])
 
     configs, success = rl.optimize_structure(
         reward_fn=reward_fn,
-        zs=zs,
+        symbols=atoms.symbols,
         positions=atoms.positions,
         fixed=[False, False, True],
     )
