@@ -20,6 +20,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--bag', help='chemical formula of initial state (e.g.: H2O)', type=str, required=False)
     group.add_argument('--initial_state', help='path to XYZ file', type=str, required=False)
+    group.add_argument('--atomcosts', help='per atom costs', type=str, required=False)
     return parser
 
 
