@@ -26,12 +26,14 @@ class Policy(torch.nn.Module):
         num_gaussians: int,
         min_max_distance: Tuple[float, float],
         beta: float,
+        infbag: bool,
     ):
         super().__init__()
 
         self.num_elements = num_elements
         self.ell_max = max_ell
         self.beta = beta
+        self.infbag = infbag
 
         # Embedding
         self.embedding = SimpleModel(
@@ -50,7 +52,10 @@ class Policy(torch.nn.Module):
         self.inv_dim = self.norm.irreps_out.dim
 
         z_irreps = o3.Irreps(f'{self.num_elements}x0e')
-        self.bag_tp = o3.FullyConnectedTensorProduct(self.cov_irreps, z_irreps, self.cov_irreps)
+
+        if self.infbag: z_irreps_bagtp = o3.Irreps(f'{self.num_elements*2}x0e')
+        else: z_irreps_bagtp = z_irreps
+        self.bag_tp = o3.FullyConnectedTensorProduct(self.cov_irreps, z_irreps_bagtp, self.cov_irreps)
 
         # Focus
         self.phi_focus = MLP(
@@ -116,7 +121,8 @@ class Policy(torch.nn.Module):
 
         # Element
         all_element_logits = self.phi_element(s_inv)  # [n_nodes, n_z]
-        all_element_probs = masked_softmax(all_element_logits, mask=(state.bag > 0)[state.batch])  # [n_nodes, n_z]
+        if self.infbag: all_element_probs = masked_softmax(all_element_logits, mask=(state.bag[:,:all_element_logits.shape[1]] > 0)[state.batch])  # [n_nodes, n_z]
+        else: all_element_probs = masked_softmax(all_element_logits, mask=(state.bag > 0)[state.batch])  # [n_nodes, n_z]
         focused_element_probs = all_element_probs[focus + state.ptr[:-1]]  # [n_graphs, n_z]
         element_distr = torch.distributions.Categorical(probs=focused_element_probs)
 

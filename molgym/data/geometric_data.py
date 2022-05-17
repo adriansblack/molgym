@@ -74,8 +74,9 @@ def tensorize_canvas(
     )
 
 
-def tensorize_bag(bag: Bag) -> tools.TensorDict:
-    return dict(bag=torch.tensor([bag], dtype=torch.long))
+def tensorize_bag(bag: Bag, floats: bool) -> tools.TensorDict:
+    if floats: return dict(bag=torch.tensor([bag.flatten()]))
+    else: return dict(bag=torch.tensor([bag.flatten()], dtype=torch.long))
 
 
 def geometrize_config(
@@ -88,13 +89,15 @@ def geometrize_config(
     return CanvasData(**info)
 
 
-def geometrize_state(state: State, cutoff: float) -> StateData:
+def geometrize_state(state: State, cutoff: float, num_classes: int=None, floats: bool=False) -> StateData:
+    if num_classes is None:
+        num_classes = len(state.bag) if state.bag.ndim==1 else len(state.bag[0])
     return StateData(
         **tensorize_canvas(elements=state.elements,
                            positions=state.positions,
                            cutoff=cutoff,
-                           num_classes=len(state.bag)),
-        **tensorize_bag(state.bag),
+                           num_classes=num_classes),
+        **tensorize_bag(state.bag, floats),
     )
 
 
@@ -122,8 +125,9 @@ def process_sa(
     state: State,
     cutoff: float,
     action: Optional[Action] = None,
+    infbag: bool = False
 ) -> Dict[str, Union[tools.TensorDict, StateData]]:
-    info: Dict[str, Union[tools.TensorDict, StateData]] = {'state': geometrize_state(state, cutoff)}
+    info: Dict[str, Union[tools.TensorDict, StateData]] = {'state': geometrize_state(state, cutoff,floats=infbag)}
 
     if action:
         info['action'] = tensorize_action(action)
@@ -134,13 +138,14 @@ def process_sa(
 def process_sars(
     sars: trajectory.SARS,
     cutoff: float,
+    infbag: bool=False,
 ) -> Dict[str, Union[torch.Tensor, tools.TensorDict, StateData]]:
     return {
-        'state': geometrize_state(sars.state, cutoff=cutoff),
+        'state': geometrize_state(sars.state, cutoff=cutoff, floats=infbag),
         'action': tensorize_action(sars.action),
         'reward': torch.tensor(sars.reward, dtype=torch.get_default_dtype()),
         'done': torch.tensor(sars.done, dtype=torch.int),
-        'next_state': geometrize_state(sars.next_state, cutoff=cutoff),
+        'next_state': geometrize_state(sars.next_state, cutoff=cutoff, floats=infbag),
     }
 
 
@@ -152,9 +157,9 @@ def state_from_td(td: tools.TensorDict) -> State:
     )
 
 
-def propagate_batch(states: StateData, actions: tools.TensorDict, cutoff: float) -> StateData:
+def propagate_batch(states: StateData, actions: tools.TensorDict, cutoff: float, infbag: bool = False) -> StateData:
     state_list = [state_from_td(state) for state in states.to_data_list()]
     action_list = actions_from_td(actions)
-    next_state_list = [propagate(s, a) for s, a in zip(state_list, action_list)]
-    next_states_processed = [geometrize_state(s_next, cutoff=cutoff) for s_next in next_state_list]
+    next_state_list = [propagate(s, a, infbag) for s, a in zip(state_list, action_list)]
+    next_states_processed = [geometrize_state(s_next, cutoff=cutoff, num_classes=states.node_attrs.shape[1], floats=infbag) for s_next in next_state_list]
     return collate_fn(next_states_processed)

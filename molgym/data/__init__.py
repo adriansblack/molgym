@@ -4,7 +4,7 @@ from .graph_tools import get_neighborhood
 from .trajectory import (State, Bag, bag_from_symbols, bag_is_empty, no_real_atoms_in_bag,
                          generate_sparse_reward_trajectory, SARS, Trajectory, propagate, state_to_atoms, Action,
                          FOCUS_KEY, ELEMENT_KEY, DISTANCE_KEY, ORIENTATION_KEY, ELEMENTS_KEY, POSITIONS_KEY, BAG_KEY,
-                         state_from_atoms, rewind_state, analyze_trajectories)
+                         state_from_atoms, rewind_state, analyze_trajectories, state_from_atom_costs)
 from .utils import Configuration, Configurations, load_xyz, config_from_atoms, SymbolTable, Symbols, Positions
 
 __all__ = [
@@ -13,5 +13,5 @@ __all__ = [
     'bag_is_empty', 'no_real_atoms_in_bag', 'State', 'generate_sparse_reward_trajectory', 'SARS', 'Trajectory',
     'propagate', 'state_to_atoms', 'Action', 'FOCUS_KEY', 'ELEMENT_KEY', 'DISTANCE_KEY', 'ORIENTATION_KEY',
     'ELEMENTS_KEY', 'POSITIONS_KEY', 'BAG_KEY', 'state_from_atoms', 'state_from_td', 'actions_from_td', 'process_sars',
-    'collate_fn', 'propagate_batch', 'rewind_state', 'analyze_trajectories', 'Symbols', 'Positions'
+    'collate_fn', 'propagate_batch', 'rewind_state', 'analyze_trajectories', 'Symbols', 'Positions','state_from_atom_costs'
 ]

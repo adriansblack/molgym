@@ -20,7 +20,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--bag', help='chemical formula of initial state (e.g.: H2O)', type=str, required=False)
     group.add_argument('--initial_state', help='path to XYZ file', type=str, required=False)
-    group.add_argument('--atomcosts', help='per atom costs', type=str, required=False)
+    group.add_argument('--symbol_costs', help='per atom costs', type=str, required=False)
     return parser
 
 
@@ -36,8 +36,11 @@ def create_trajectories(
     cutoff: float,
     num_paths: int,
     seed: int,
+    infbag: bool = False,
 ) -> List[data.Trajectory]:
-    graph = data.graph_tools.generate_topology(end_point.state.positions, cutoff_distance=cutoff)
+    nodes = len(end_point.state.elements)
+    if infbag: nodes-=1
+    graph = data.graph_tools.generate_topology(end_point.state.positions[:nodes], cutoff_distance=cutoff)
     if not nx.is_connected(graph):
         return []
 
@@ -45,13 +48,14 @@ def create_trajectories(
     for i in range(num_paths):
         sequence = data.graph_tools.breadth_first_rollout(graph,
                                                           seed=seed + i,
-                                                          visited=list(range(end_point.start_index)))
+                                                          visited=list(range(end_point.start_index)))+[nodes]
         tau = data.generate_sparse_reward_trajectory(
             terminal_state=data.State(elements=end_point.state.elements[sequence],
                                       positions=end_point.state.positions[sequence],
                                       bag=end_point.state.bag),
             final_reward=end_point.reward,
             start_index=end_point.start_index,
+            infbag=infbag
         )
         taus.append(tau)
 
@@ -76,6 +80,10 @@ def main() -> None:
     s_table = data.SymbolTable(args.symbols)
     logging.info(s_table)
 
+    #Infinite Bag
+    if args.symbol_costs: infbag = True
+    else: infbag = False
+
     # Create modules
     agent = rl.SACAgent(
         r_max=args.r_max,
@@ -89,6 +97,7 @@ def main() -> None:
         num_gaussians=args.num_gaussians,
         min_max_distance=(args.d_min, args.d_max),
         beta=args.beta,
+        infbag=infbag,
     )
     logging.info(agent)
     target = rl.SACTarget(agent)
@@ -112,13 +121,18 @@ def main() -> None:
     if args.initial_state:
         atoms = ase.io.read(args.initial_state, index=0, format='extxyz')
         initial_state = data.state_from_atoms(atoms, s_table=s_table)
-    else:
+    elif args.bag:
         dummy_state = data.state_from_atoms(ase.Atoms(args.bag), s_table=s_table)
         initial_state = data.rewind_state(dummy_state, 0)
+    elif args.symbol_costs:
+        atom_costs = dict(map(lambda s: s.split('='), args.symbol_costs.split(' ')))
+        atoms = ase.Atoms(''.join([atom for atom in atom_costs]))
+        dummy_state = data.state_from_atom_costs(atoms, atom_costs, s_table=s_table)
+        initial_state = data.rewind_state(dummy_state, 0, infbag=True)
 
     logging.info(f'Initial state: canvas={len(initial_state.elements)} atom(s), bag={initial_state.bag}')
     envs = rl.EnvironmentCollection([
-        rl.DiscreteMolecularEnvironment(reward_fn, initial_state, s_table, min_reward=args.min_reward)
+        rl.DiscreteMolecularEnvironment(reward_fn, initial_state, s_table, min_reward=args.min_reward, infbag=infbag)
         for _ in range(args.num_envs)
     ])
 
@@ -204,6 +218,7 @@ def main() -> None:
                 cutoff=args.r_max,
                 num_paths=max(int(args.num_paths_per_atom * len(end_point.state.elements)), 1),
                 seed=args.seed,
+                infbag=infbag,
             )
         new_taus = generated_trajectories
 
@@ -218,7 +233,7 @@ def main() -> None:
         trajectory_lengths += [len(tau) for tau in new_taus]
         if args.max_num_episodes is not None:
             trajectory_lengths = trajectory_lengths[-args.max_num_episodes:]
-        dataset += [data.process_sars(sars=sars, cutoff=args.d_max) for tau in new_taus for sars in tau]
+        dataset += [data.process_sars(sars=sars, cutoff=args.d_max, infbag=infbag) for tau in new_taus for sars in tau]
         dataset = dataset[-sum(trajectory_lengths):]
 
         logging.debug(f'Preparing dataloader with {len(dataset)} steps')
@@ -270,7 +285,7 @@ def main() -> None:
             logging.info(f'eval_return={tau_eval["return"]:.3f}')
 
             terminal_atoms = [
-                data.state_to_atoms(tau[-1].next_state, s_table, info={'reward': tau[-1].reward})
+                data.state_to_atoms(tau[-1].next_state, s_table, info={'reward': tau[-1].reward}, infbag=infbag)
                 for tau in eval_trajectories
             ]
             ase.io.write(os.path.join(args.log_dir, f'terminals_{tag}_{i}.xyz'), images=terminal_atoms, format='extxyz')

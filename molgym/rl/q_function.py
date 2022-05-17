@@ -16,6 +16,7 @@ class QFunction(torch.nn.Module):
         num_elements: int,
         hidden_irreps: o3.Irreps,
         network_width: int,
+        infbag: bool = False,
     ) -> None:
         super().__init__()
 
@@ -37,6 +38,7 @@ class QFunction(torch.nn.Module):
             gate=torch.nn.ReLU(),
         )
 
+        if(infbag): num_elements = num_elements*2
         self.psi = modules.MLP(
             input_dim=network_width + num_elements,
             output_dims=(network_width, 1),

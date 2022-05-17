@@ -27,6 +27,7 @@ class SACAgent(torch.nn.Module):
         num_gaussians: int,
         min_max_distance: Tuple[float, float],
         beta: float,
+        infbag: bool,
     ):
         super().__init__()
 
@@ -42,7 +43,10 @@ class SACAgent(torch.nn.Module):
             num_gaussians=num_gaussians,
             min_max_distance=min_max_distance,
             beta=beta,
+            infbag=infbag
         )
+
+        self.infbag = infbag
 
         self.q1, self.q2 = tuple(
             QFunction(
@@ -54,6 +58,7 @@ class SACAgent(torch.nn.Module):
                 num_elements=num_elements,
                 hidden_irreps=hidden_irreps,
                 network_width=network_width,
+                infbag = infbag,
             ) for _ in range(2))
 
     def forward(self, *args, **kwargs):

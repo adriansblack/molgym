@@ -21,7 +21,7 @@ def compute_loss_q(
     with torch.no_grad():
         # Target actions come from *current* policy
         response, _aux = ac.policy(batch['next_state'], action=None, training=True)
-        s_next_next = data.propagate_batch(batch['next_state'], response['action'], cutoff=cutoff)
+        s_next_next = data.propagate_batch(batch['next_state'], response['action'], cutoff=cutoff, infbag=ac.infbag)
         s_next_next.to(device)
 
         # Target Q-values Q(T(s', a'))

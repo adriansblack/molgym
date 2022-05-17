@@ -9,8 +9,11 @@ from molgym.data import Action, State, SymbolTable
 from .reward import SparseInteractionReward
 
 
-def is_terminal(state: State) -> bool:
-    return data.no_real_atoms_in_bag(state.bag)
+def is_terminal(state: State, infbag : bool = False) -> bool:
+    if infbag: 
+        if len(state.elements)>=10: return True
+        return state.elements[-1]==0 #Matches 'X'
+    else: return data.no_real_atoms_in_bag(state.bag)
 
 
 def any_too_close(
@@ -42,6 +45,7 @@ class DiscreteMolecularEnvironment(MolecularEnvironment):
             min_atomic_distance=0.6,  # Angstrom
             max_solo_distance=2.0,  # Angstrom
             min_reward=-0.6,  # Hartree
+            infbag = False
     ):
         self.reward_fn = reward_fn
         self.initial_state = initial_state
@@ -57,6 +61,7 @@ class DiscreteMolecularEnvironment(MolecularEnvironment):
 
         self.current_state = self.initial_state
         self.terminal = False
+        self.infbag = infbag
 
     def reset(self) -> State:
         self.current_state = self.initial_state
@@ -67,7 +72,7 @@ class DiscreteMolecularEnvironment(MolecularEnvironment):
         if self.terminal:
             raise RuntimeError('Stepping with terminal state')
 
-        self.current_state = data.propagate(self.current_state, action)
+        self.current_state = data.propagate(self.current_state, action, self.infbag)
 
         # Is state valid?
         if not self._is_valid_state(self.current_state):
@@ -75,10 +80,17 @@ class DiscreteMolecularEnvironment(MolecularEnvironment):
             return self.current_state, self.min_reward, True, {}
 
         # Is state terminal?
-        if is_terminal(self.current_state):
+        if is_terminal(self.current_state, self.infbag):
             done = True
             self.terminal = True
-            reward, info = self._calculate_reward(self.current_state)
+
+            if self.infbag: rew_state = data.rewind_state(self.current_state, -1, infbag=True)
+            else: rew_state = self.current_state
+            
+            reward, info = self._calculate_reward(rew_state)
+            if len(rew_state.elements)==0: reward = self.min_reward
+
+            if self.infbag: reward +=np.sum(rew_state.bag[1][rew_state.elements])
         else:
             done = False
             reward, info = 0.0, {}
@@ -93,7 +105,7 @@ class DiscreteMolecularEnvironment(MolecularEnvironment):
 
     def _is_valid_state(self, state: State) -> bool:
         # Check bag
-        if any(item < 0 for item in state.bag):
+        if not self.infbag and any(item < 0 for item in state.bag):
             return False
 
         # Check canvas

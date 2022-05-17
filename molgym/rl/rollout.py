@@ -29,7 +29,7 @@ def rollout(
     while ((num_iters is None or iter_counter < num_iters)
            and (num_episodes is None or episode_counter < num_episodes)):
         data_loader = data.DataLoader(
-            dataset=[data.process_sa(state=state, cutoff=d_max, action=None) for state in states],
+            dataset=[data.process_sa(state=state, cutoff=d_max, action=None, infbag=agent.infbag) for state in states],
             batch_size=batch_size,
             shuffle=False,
             drop_last=False,

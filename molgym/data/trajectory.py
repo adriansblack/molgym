@@ -17,13 +17,21 @@ ORIENTATION_KEY = 'orientation'
 
 Bag = np.ndarray
 
-
 def bag_from_symbols(symbols: Iterable[str], s_table: SymbolTable) -> Bag:
     bag = [0] * len(s_table)
     for symbol in symbols:
         bag[s_table.symbol_to_element(symbol)] += 1
 
     return np.array(bag, dtype=int)
+
+def bag_from_atom_costs(atom_costs: Dict[str,float], s_table: SymbolTable) -> Bag:
+    bag = np.zeros((2,len(atom_costs)))
+    for atom,cost in atom_costs.items():
+        col = s_table.symbol_to_element(atom)
+        bag[0,col] = 1
+        bag[1,col] = float(cost)
+
+    return bag
 
 
 def bag_from_symbol_count_dict(symbol_count_dict: Dict[str, int], z_table: SymbolTable) -> Bag:
@@ -84,13 +92,16 @@ class SARS:
 Trajectory = Sequence[SARS]
 
 
-def propagate(state: State, action: Action) -> State:
-    bag = remove_atom_from_bag(action.element, state.bag)
+def propagate(state: State, action: Action, infbag: bool = False) -> State:
+    if infbag: 
+        bag = state.bag
+    else:
+        bag = remove_atom_from_bag(action.element, state.bag)
 
-    # If bag is empty, add sentinel element at position 0
-    if bag_is_empty(bag):
-        bag = add_atom_to_bag(label=0, bag=bag)
-
+        # If bag is empty, add sentinel element at position 0
+        if bag_is_empty(bag):
+            bag = add_atom_to_bag(label=0, bag=bag)
+            
     if len(state.elements) == 1 and state.elements[0] == 0:
         return State(
             elements=np.array([action.element], dtype=int),
@@ -106,8 +117,9 @@ def propagate(state: State, action: Action) -> State:
     )
 
 
-def state_to_atoms(state: State, s_table: SymbolTable, info: Optional[Dict] = None) -> ase.Atoms:
-    d = {BAG_KEY: {s_table.element_to_symbol(i): int(v) for i, v in enumerate(state.bag)}}
+def state_to_atoms(state: State, s_table: SymbolTable, info: Optional[Dict] = None, infbag=False) -> ase.Atoms:
+    if infbag: d = {BAG_KEY: {s_table.element_to_symbol(i): [int(v),cost] for i, (v,cost) in enumerate(state.bag.T)}}
+    else: d = {BAG_KEY: {s_table.element_to_symbol(i): int(v) for i, v in enumerate(state.bag)}}
     if info is not None:
         d.update(info)
     return ase.Atoms(
@@ -129,6 +141,18 @@ def state_from_atoms(atoms: ase.Atoms, s_table: SymbolTable) -> State:
         bag = bag_from_symbol_count_dict(atoms.info[BAG_KEY].items(), z_table=s_table)
     else:
         bag = bag_from_symbols(symbols=['X'], s_table=s_table)
+
+    return State(elements=elements, positions=positions, bag=bag)
+
+def state_from_atom_costs(atoms: ase.Atoms, atom_costs: Dict[str,float], s_table: SymbolTable) -> State:
+    if len(atoms) == 0:
+        elements = np.array([0], dtype=int)
+        positions = np.array([[0.0, 0.0, 0.0]], dtype=float)
+    else:
+        elements = np.array([s_table.symbol_to_element(s) for s in atoms.symbols])
+        positions = atoms.positions
+
+    bag = bag_from_atom_costs(atom_costs, s_table=s_table)
 
     return State(elements=elements, positions=positions, bag=bag)
 
@@ -161,7 +185,7 @@ def get_action(
     )
 
 
-def rewind_state(s: State, index: int) -> State:
+def rewind_state(s: State, index: int, infbag : bool = False) -> State:
     if index == 0:
         elements = np.array([0], dtype=int)
         positions = np.array([[0.0, 0.0, 0.0]], dtype=float)
@@ -171,11 +195,12 @@ def rewind_state(s: State, index: int) -> State:
 
     # Place remaining atoms into bag
     bag = s.bag
-    for e in s.elements[index:]:
-        bag = add_atom_to_bag(e, bag)
+    if not infbag:
+        for e in s.elements[index:]:
+            bag = add_atom_to_bag(e, bag)
 
-    if not no_real_atoms_in_bag(bag) and bag[0] != 0:
-        bag = remove_atom_from_bag(0, bag)
+        if not no_real_atoms_in_bag(bag) and bag[0] != 0:
+            bag = remove_atom_from_bag(0, bag)
 
     return State(elements, positions, bag)
 
@@ -185,6 +210,7 @@ def generate_sparse_reward_trajectory(
     final_reward: float,
     start_index: int = 0,
     focuses: Optional[List[Optional[int]]] = None,
+    infbag: bool = False
 ) -> Trajectory:
     assert 0 <= start_index <= len(terminal_state.elements)
 
@@ -194,7 +220,7 @@ def generate_sparse_reward_trajectory(
         assert len(terminal_state.elements) - start_index == len(focuses)
 
     tau = []
-    state = rewind_state(terminal_state, index=start_index)
+    state = rewind_state(terminal_state, index=start_index, infbag=infbag)
     for i, focus in zip(range(start_index, len(terminal_state.elements)), focuses):
         action = get_action(
             state=state,
@@ -202,7 +228,7 @@ def generate_sparse_reward_trajectory(
             element=terminal_state.elements[i],
             position=terminal_state.positions[i],
         )
-        next_state = rewind_state(terminal_state, index=i + 1)
+        next_state = rewind_state(terminal_state, index=i + 1, infbag=infbag)
         tau.append(
             SARS(
                 state=state,
