@@ -229,7 +229,7 @@ def main():
 
     # Parse Z table
     s_table = data.SymbolTable(args.symbols)
-    symbols = [s_table.symbols]
+    symbols = [s for s in s_table.symbols]
     # symbols = [ase.data.chemical_symbols[z] for z in s_table.symbols]
 
     focuses = atoms.info.get('focuses', None)
