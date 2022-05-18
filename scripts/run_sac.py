@@ -49,7 +49,8 @@ def create_trajectories(
     for i in range(num_paths):
         sequence = data.graph_tools.breadth_first_rollout(graph,
                                                           seed=seed + i,
-                                                          visited=list(range(end_point.start_index)))+[nodes]
+                                                          visited=list(range(end_point.start_index)))
+        if infbag: sequence + [nodes]
         tau = data.generate_sparse_reward_trajectory(
             terminal_state=data.State(elements=end_point.state.elements[sequence],
                                       positions=end_point.state.positions[sequence],
