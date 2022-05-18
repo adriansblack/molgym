@@ -17,7 +17,7 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument('--model', help='path to model', type=str, required=True)
     parser.add_argument('--checkpoint', help='path to checkpoint', type=str, required=False)
-    parser.add_argument('--zs', help='atomic numbers in table', type=str, required=True)
+    parser.add_argument('--symbols', help='symbols', type=str, required=True)
     parser.add_argument('--xyz', help='path to trajectory (.xyz)', type=str, required=True)
     parser.add_argument('--index', help='config in XYZ file', type=int, required=False, default=0)
 
@@ -228,12 +228,13 @@ def main():
     atoms = ase.io.read(args.xyz, format='extxyz', index=args.index)
 
     # Parse Z table
-    z_table = data.SymbolTable([int(z) for z in args.zs.split(',')])
-    symbols = [ase.data.chemical_symbols[z] for z in z_table.symbols]
+    s_table = data.SymbolTable(args.symbols)
+    symbols = [s for s in s_table.symbols]
+    # symbols = [ase.data.chemical_symbols[z] for z in s_table.symbols]
 
     focuses = atoms.info.get('focuses', None)
     assert len(focuses) == len(atoms) if focuses is not None else True
-    terminal_state = data.state_from_atoms(atoms, z_table)
+    terminal_state = data.state_from_atoms(atoms, s_table)
     sars_list = data.generate_sparse_reward_trajectory(terminal_state, final_reward=0.0, focuses=focuses)
 
     data_loader = data.DataLoader(

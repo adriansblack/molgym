@@ -126,7 +126,7 @@ def state_from_atoms(atoms: ase.Atoms, s_table: SymbolTable) -> State:
         positions = atoms.positions
 
     if BAG_KEY in atoms.info:
-        bag = bag_from_symbol_count_dict(atoms.info[BAG_KEY].items(), z_table=s_table)
+        bag = bag_from_symbol_count_dict(atoms.info[BAG_KEY], z_table=s_table)
     else:
         bag = bag_from_symbols(symbols=['X'], s_table=s_table)
 
