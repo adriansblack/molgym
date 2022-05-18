@@ -28,7 +28,8 @@ def bag_from_atom_costs(atom_costs: Dict[str,float], s_table: SymbolTable) -> Ba
     bag = np.zeros((2,len(atom_costs)))
     for atom,cost in atom_costs.items():
         col = s_table.symbol_to_element(atom)
-        bag[0,col] = 1
+        if atom=='X': bag[0,col] = 0
+        else: bag[0,col] = 1
         bag[1,col] = float(cost)
 
     return bag
@@ -118,13 +119,16 @@ def propagate(state: State, action: Action, infbag: bool = False) -> State:
 
 
 def state_to_atoms(state: State, s_table: SymbolTable, info: Optional[Dict] = None, infbag=False) -> ase.Atoms:
-    if infbag: d = {BAG_KEY: {s_table.element_to_symbol(i): [int(v),cost] for i, (v,cost) in enumerate(state.bag.T)}}
+    num_elems = len(state.elements)
+    if infbag: 
+        d = {BAG_KEY: {s_table.element_to_symbol(i): [int(v),cost] for i, (v,cost) in enumerate(state.bag.T)}}
+        num_elems -=1
     else: d = {BAG_KEY: {s_table.element_to_symbol(i): int(v) for i, v in enumerate(state.bag)}}
     if info is not None:
         d.update(info)
     return ase.Atoms(
-        symbols=[s_table.element_to_symbol(e) for e in state.elements],
-        positions=state.positions,
+        symbols=[s_table.element_to_symbol(e) for e in state.elements[:num_elems]],
+        positions=state.positions[:num_elems],
         info=d,
     )
 
@@ -152,6 +156,7 @@ def state_from_atom_costs(atoms: ase.Atoms, atom_costs: Dict[str,float], s_table
         elements = np.array([s_table.symbol_to_element(s) for s in atoms.symbols])
         positions = atoms.positions
 
+    atom_costs['Z']=0.0
     bag = bag_from_atom_costs(atom_costs, s_table=s_table)
 
     return State(elements=elements, positions=positions, bag=bag)

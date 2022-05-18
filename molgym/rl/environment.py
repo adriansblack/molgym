@@ -9,10 +9,10 @@ from molgym.data import Action, State, SymbolTable
 from .reward import SparseInteractionReward
 
 
-def is_terminal(state: State, infbag : bool = False) -> bool:
+def is_terminal(state: State, infbag : bool = False, stop_idx: int = None) -> bool:
     if infbag: 
         if len(state.elements)>=10: return True
-        return state.elements[-1]==0 #Matches 'X'
+        return state.elements[-1]==stop_idx #Matches 'Z'
     else: return data.no_real_atoms_in_bag(state.bag)
 
 
@@ -45,7 +45,8 @@ class DiscreteMolecularEnvironment(MolecularEnvironment):
             min_atomic_distance=0.6,  # Angstrom
             max_solo_distance=2.0,  # Angstrom
             min_reward=-0.6,  # Hartree
-            infbag = False
+            infbag = False,
+            stop_idx = None
     ):
         self.reward_fn = reward_fn
         self.initial_state = initial_state
@@ -62,6 +63,7 @@ class DiscreteMolecularEnvironment(MolecularEnvironment):
         self.current_state = self.initial_state
         self.terminal = False
         self.infbag = infbag
+        self.stop_idx = stop_idx
 
     def reset(self) -> State:
         self.current_state = self.initial_state
@@ -80,7 +82,7 @@ class DiscreteMolecularEnvironment(MolecularEnvironment):
             return self.current_state, self.min_reward, True, {}
 
         # Is state terminal?
-        if is_terminal(self.current_state, self.infbag):
+        if is_terminal(self.current_state, self.infbag, self.stop_idx):
             done = True
             self.terminal = True
 

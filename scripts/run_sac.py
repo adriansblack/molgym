@@ -2,6 +2,7 @@ import argparse
 import dataclasses
 import logging
 import os
+from tracemalloc import stop
 from typing import Any, Dict, List
 
 import ase
@@ -126,13 +127,15 @@ def main() -> None:
         initial_state = data.rewind_state(dummy_state, 0)
     elif args.symbol_costs:
         atom_costs = dict(map(lambda s: s.split('='), args.symbol_costs.split(' ')))
+        if 'Z' in atom_costs: atom_costs.pop('Z')
         atoms = ase.Atoms(''.join([atom for atom in atom_costs]))
         dummy_state = data.state_from_atom_costs(atoms, atom_costs, s_table=s_table)
         initial_state = data.rewind_state(dummy_state, 0, infbag=True)
 
+    stop_idx = s_table.symbol_to_element('Z') if infbag else None
     logging.info(f'Initial state: canvas={len(initial_state.elements)} atom(s), bag={initial_state.bag}')
     envs = rl.EnvironmentCollection([
-        rl.DiscreteMolecularEnvironment(reward_fn, initial_state, s_table, min_reward=args.min_reward, infbag=infbag)
+        rl.DiscreteMolecularEnvironment(reward_fn, initial_state, s_table, min_reward=args.min_reward, infbag=infbag, stop_idx=stop_idx)
         for _ in range(args.num_envs)
     ])
 
