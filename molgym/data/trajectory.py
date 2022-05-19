@@ -119,16 +119,15 @@ def propagate(state: State, action: Action, infbag: bool = False) -> State:
 
 
 def state_to_atoms(state: State, s_table: SymbolTable, info: Optional[Dict] = None, infbag=False) -> ase.Atoms:
-    num_elems = len(state.elements)
     if infbag: 
         d = {BAG_KEY: {s_table.element_to_symbol(i): [int(v),cost] for i, (v,cost) in enumerate(state.bag.T)}}
-        num_elems -=1
+        if s_table.element_to_symbol(state.elements[-1])=='Z': state.elements[-1]=s_table.symbol_to_element('X')
     else: d = {BAG_KEY: {s_table.element_to_symbol(i): int(v) for i, v in enumerate(state.bag)}}
     if info is not None:
         d.update(info)
     return ase.Atoms(
-        symbols=[s_table.element_to_symbol(e) for e in state.elements[:num_elems]],
-        positions=state.positions[:num_elems],
+        symbols=[s_table.element_to_symbol(e) for e in state.elements],
+        positions=state.positions,
         info=d,
     )
 

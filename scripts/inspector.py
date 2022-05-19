@@ -230,21 +230,29 @@ def main():
     # Parse Z table
     s_table = data.SymbolTable(args.symbols)
     symbols = [s for s in s_table.symbols]
+
+    infbag = False
+    if 'Z' in symbols: infbag = True
     # symbols = [ase.data.chemical_symbols[z] for z in s_table.symbols]
 
     focuses = atoms.info.get('focuses', None)
     assert len(focuses) == len(atoms) if focuses is not None else True
-    terminal_state = data.state_from_atoms(atoms, s_table)
-    sars_list = data.generate_sparse_reward_trajectory(terminal_state, final_reward=0.0, focuses=focuses)
+    if infbag: 
+        atom_costs = {k:v[1] for k,v in atoms.info['bag'].items()}
+        terminal_state = data.state_from_atom_costs(atoms, atom_costs, s_table=s_table)
+        if len(terminal_state.elements)>1 and terminal_state.elements[-1]=='X': terminal_state.elements[-1]='Z'
+    else: terminal_state = data.state_from_atoms(atoms, s_table)
+    sars_list = data.generate_sparse_reward_trajectory(terminal_state, final_reward=0.0, focuses=focuses, infbag=infbag)
 
     data_loader = data.DataLoader(
-        dataset=[data.process_sa(state=item.state, cutoff=args.d_max, action=item.action) for item in sars_list],
+        dataset=[data.process_sa(state=item.state, cutoff=args.d_max, action=item.action, infbag=infbag) for item in sars_list],
         batch_size=1,
         shuffle=False,
         drop_last=False,
     )
 
-    for batch in data_loader:
+    for idx_b, batch in enumerate(data_loader):
+        print('batch {n}'.format(n=idx_b))
         batch = tools.dict_to_device(batch, device)
         output, aux = model(batch['state'], action=batch['action'], training=False)
         action = output['action']
