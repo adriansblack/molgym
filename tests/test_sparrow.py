@@ -2,7 +2,7 @@ import os
 
 import ase.io
 import numpy as np
-import pkg_resources
+# import pkg_resources
 from ase import Atoms
 
 from molgym.rl.calculator import Sparrow
@@ -57,3 +57,5 @@ def test_energy_gradients():
     gradients_file = os.path.join(resources_path, 'gradients.dat')
     expected_gradients = np.genfromtxt(gradients_file)
     assert np.allclose(gradients, expected_gradients)
+
+test_atomic_energies()

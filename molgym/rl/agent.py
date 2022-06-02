@@ -28,6 +28,8 @@ class SACAgent(torch.nn.Module):
         min_max_distance: Tuple[float, float],
         beta: float,
         infbag: bool,
+        stop_idx: int=None,
+        stop_logit_adj: float=0,
     ):
         super().__init__()
 
@@ -43,7 +45,9 @@ class SACAgent(torch.nn.Module):
             num_gaussians=num_gaussians,
             min_max_distance=min_max_distance,
             beta=beta,
-            infbag=infbag
+            infbag=infbag,
+            stop_idx=stop_idx,
+            stop_logit_adj=stop_logit_adj
         )
 
         self.infbag = infbag

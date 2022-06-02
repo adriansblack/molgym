@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Iterable, Sequence, List, Optional, Dict, Union
-
+from collections import Counter
 import ase.data
 import numpy as np
 
@@ -24,11 +24,12 @@ def bag_from_symbols(symbols: Iterable[str], s_table: SymbolTable) -> Bag:
 
     return np.array(bag, dtype=int)
 
-def bag_from_atom_costs(atom_costs: Dict[str,float], s_table: SymbolTable) -> Bag:
+def bag_from_atom_costs(atom_costs: Dict[str,float], s_table: SymbolTable, Zmask: bool = True) -> Bag:
     bag = np.zeros((2,len(atom_costs)))
     for atom,cost in atom_costs.items():
         col = s_table.symbol_to_element(atom)
         if atom=='X': bag[0,col] = 0
+        elif atom=='Z' and Zmask:  bag[0,col] = 0
         else: bag[0,col] = 1
         bag[1,col] = float(cost)
 
@@ -93,9 +94,9 @@ class SARS:
 Trajectory = Sequence[SARS]
 
 
-def propagate(state: State, action: Action, infbag: bool = False) -> State:
+def propagate(state: State, action: Action, infbag: bool = False, new_bag: Bag = None) -> State:
     if infbag: 
-        bag = state.bag
+        bag = new_bag
     else:
         bag = remove_atom_from_bag(action.element, state.bag)
 
@@ -147,17 +148,43 @@ def state_from_atoms(atoms: ase.Atoms, s_table: SymbolTable) -> State:
 
     return State(elements=elements, positions=positions, bag=bag)
 
-def state_from_atom_costs(atoms: ase.Atoms, atom_costs: Dict[str,float], s_table: SymbolTable) -> State:
+# def state_from_atom_costs(atoms: ase.Atoms, atom_costs: Dict[str,float], s_table: SymbolTable) -> State:
+#     if len(atoms) == 0:
+#         elements = np.array([0], dtype=int)
+#         positions = np.array([[0.0, 0.0, 0.0]], dtype=float)
+#     else:
+#         elements = np.array([s_table.symbol_to_element(s) for s in atoms.symbols])
+#         positions = atoms.positions
+
+#     atom_costs['Z']=0.0
+#     bag = bag_from_atom_costs(atom_costs, s_table=s_table)
+
+#     return State(elements=elements, positions=positions, bag=bag)
+
+def state_from_atom_costsched(atoms: ase.Atoms, cost_sched: Dict, s_table: SymbolTable, zMask: bool) -> State:
     if len(atoms) == 0:
         elements = np.array([0], dtype=int)
         positions = np.array([[0.0, 0.0, 0.0]], dtype=float)
     else:
         elements = np.array([s_table.symbol_to_element(s) for s in atoms.symbols])
         positions = atoms.positions
+    
+    def init_cost(atom,cost_tups):
+        for cost_tup in cost_tups:
+            if cost_tup[1]==0: return cost_tup[0]
+        raise ValueError(f'No initial cost specified for "{atom}"') 
+    atom_costs_init = {k: init_cost(k,v) for k, v in cost_sched.items()}
+    bag = bag_from_atom_costs(atom_costs_init, s_table=s_table, Zmask=zMask)
 
-    atom_costs['Z']=0.0
-    bag = bag_from_atom_costs(atom_costs, s_table=s_table)
+    return State(elements=elements, positions=positions, bag=bag)
 
+def state_from_atom_bag(atoms: ase.Atoms, bag: Bag, s_table: SymbolTable) -> State:
+    if len(atoms) == 0:
+        elements = np.array([0], dtype=int)
+        positions = np.array([[0.0, 0.0, 0.0]], dtype=float)
+    else:
+        elements = np.array([s_table.symbol_to_element(s) for s in atoms.symbols])
+        positions = atoms.positions
     return State(elements=elements, positions=positions, bag=bag)
 
 
@@ -189,7 +216,7 @@ def get_action(
     )
 
 
-def rewind_state(s: State, index: int, infbag : bool = False) -> State:
+def rewind_state(s: State, index: int, infbag : bool = False, byiter : bool = True, bag_schedule : np.ndarray = None) -> State:
     if index == 0:
         elements = np.array([0], dtype=int)
         positions = np.array([[0.0, 0.0, 0.0]], dtype=float)
@@ -197,9 +224,17 @@ def rewind_state(s: State, index: int, infbag : bool = False) -> State:
         elements = s.elements[:index]
         positions = s.positions[:index]
 
-    # Place remaining atoms into bag
-    bag = s.bag
-    if not infbag:
+    if infbag:
+        if bag_schedule is not None: #environment initialized 
+            if index==-1: index=len(elements)
+            if byiter: bag = np.vstack([s.bag[0],bag_schedule[min(index,len(bag_schedule)-1)]])
+            else: 
+                bag = np.vstack([s.bag[0],bag_schedule[0]])
+                for elem,count in Counter(elements).items():
+                    count = min(count,len(bag_schedule)-1)
+                    bag[1,elem]=bag_schedule[count,elem]   
+        else: bag = s.bag
+    else:
         for e in s.elements[index:]:
             bag = add_atom_to_bag(e, bag)
 
@@ -214,7 +249,8 @@ def generate_sparse_reward_trajectory(
     final_reward: float,
     start_index: int = 0,
     focuses: Optional[List[Optional[int]]] = None,
-    infbag: bool = False
+    infbag: bool = False,
+    bag_traj: List = None
 ) -> Trajectory:
     assert 0 <= start_index <= len(terminal_state.elements)
 
@@ -233,6 +269,9 @@ def generate_sparse_reward_trajectory(
             position=terminal_state.positions[i],
         )
         next_state = rewind_state(terminal_state, index=i + 1, infbag=infbag)
+        if bag_traj:
+            state.bag = bag_traj[i]
+            next_state.bag = bag_traj[i+1]
         tau.append(
             SARS(
                 state=state,

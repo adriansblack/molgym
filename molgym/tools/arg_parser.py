@@ -74,6 +74,12 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument('--min_reward', help='minimal reward', type=float, default=-0.6)
     parser.add_argument('--max_opt_iters', help='maximum number of optimization iterations', type=int, default=0)
 
+    #inf bag
+    parser.add_argument('--byiter', help='increase costs with iteration count (versus atom count)', action='store_true', default=False)
+    parser.add_argument('--keepall_trajs', help='increase costs with iteration count (versus atom count)', action='store_true', default=False)
+    parser.add_argument('--maskZ', help='Force placement of initial atom', action='store_true', default=False)
+    parser.add_argument('--stop_logit_adj', help='STOP atom logit initialization', type=float, default=0.0)
+
     return parser
 
 

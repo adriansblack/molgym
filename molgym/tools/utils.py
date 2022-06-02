@@ -82,3 +82,20 @@ def random_train_valid_split(items: Sequence, valid_fraction: float, seed: int) 
     rng.shuffle(indices)
 
     return [items[i] for i in indices[:train_size]], [items[i] for i in indices[train_size:]]
+
+def process_symbol_costs_str(symbol_costs):
+    def cost_se(cost_se_str):
+        cost,se = cost_se_str.split('@')
+        cost = float(cost)
+        if ':' in se:
+            s,e = se.split(':')
+            s,e = int(s), int(e)
+        else: 
+            s = int(se)
+            e = s
+        return (cost,s,e)
+    def split_counts(atom_str):
+        atom,cost_se_str = atom_str.split('=')
+        costs = list(map(cost_se,cost_se_str.split(','))) 
+        return [atom,costs]
+    return dict(map(split_counts, symbol_costs.split(' ')))

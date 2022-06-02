@@ -27,6 +27,8 @@ class Policy(torch.nn.Module):
         min_max_distance: Tuple[float, float],
         beta: float,
         infbag: bool,
+        stop_idx: int=None,
+        stop_logit_adj: float=0,
     ):
         super().__init__()
 
@@ -97,6 +99,10 @@ class Policy(torch.nn.Module):
                                        internal_weights=False)
         self.mix_tp_weights = o3.Linear(o3.Irreps(f'{num_bessel}x0e'), o3.Irreps(f'{self.mix_tp.weight_numel}x0e'))
 
+        #inf bag
+        self.stop_logit_adj = stop_logit_adj
+        self.stop_idx = stop_idx
+
     def forward(
         self,
         state: StateBatch,
@@ -121,7 +127,9 @@ class Policy(torch.nn.Module):
 
         # Element
         all_element_logits = self.phi_element(s_inv)  # [n_nodes, n_z]
-        if self.infbag: all_element_probs = masked_softmax(all_element_logits, mask=(state.bag[:,:all_element_logits.shape[1]] > 0)[state.batch])  # [n_nodes, n_z]
+        if self.infbag: 
+            all_element_logits[:,self.stop_idx] += self.stop_logit_adj
+            all_element_probs = masked_softmax(all_element_logits, mask=(state.bag[:,:all_element_logits.shape[1]] > 0)[state.batch])  # [n_nodes, n_z]
         else: all_element_probs = masked_softmax(all_element_logits, mask=(state.bag > 0)[state.batch])  # [n_nodes, n_z]
         focused_element_probs = all_element_probs[focus + state.ptr[:-1]]  # [n_graphs, n_z]
         element_distr = torch.distributions.Categorical(probs=focused_element_probs)

@@ -30,6 +30,7 @@ class EndPoint:
     state: data.State
     start_index: int
     reward: float
+    bag_traj: None
 
 
 def create_trajectories(
@@ -50,19 +51,19 @@ def create_trajectories(
         sequence = data.graph_tools.breadth_first_rollout(graph,
                                                           seed=seed + i,
                                                           visited=list(range(end_point.start_index)))
-        if infbag: sequence + [nodes]
+        if infbag: sequence = sequence + [nodes]
         tau = data.generate_sparse_reward_trajectory(
             terminal_state=data.State(elements=end_point.state.elements[sequence],
                                       positions=end_point.state.positions[sequence],
                                       bag=end_point.state.bag),
             final_reward=end_point.reward,
             start_index=end_point.start_index,
-            infbag=infbag
+            infbag=infbag,
+            bag_traj=end_point.bag_traj
         )
         taus.append(tau)
 
     return taus
-
 
 def main() -> None:
     parser = tools.build_default_arg_parser()
@@ -85,7 +86,11 @@ def main() -> None:
     #Infinite Bag
     if args.symbol_costs: infbag = True
     else: infbag = False
-
+    costs_sched = None
+    if args.byiter: byiter = True
+    else: byiter = False
+    stop_idx = s_table.symbol_to_element('Z') if infbag else None
+    
     # Create modules
     agent = rl.SACAgent(
         r_max=args.r_max,
@@ -100,6 +105,8 @@ def main() -> None:
         min_max_distance=(args.d_min, args.d_max),
         beta=args.beta,
         infbag=infbag,
+        stop_idx = stop_idx,
+        stop_logit_adj= args.stop_logit_adj,
     )
     logging.info(agent)
     target = rl.SACTarget(agent)
@@ -127,16 +134,14 @@ def main() -> None:
         dummy_state = data.state_from_atoms(ase.Atoms(args.bag), s_table=s_table)
         initial_state = data.rewind_state(dummy_state, 0)
     elif args.symbol_costs:
-        atom_costs = dict(map(lambda s: s.split('='), args.symbol_costs.split(' ')))
-        if 'Z' in atom_costs: atom_costs.pop('Z')
-        atoms = ase.Atoms(''.join([atom for atom in atom_costs]))
-        dummy_state = data.state_from_atom_costs(atoms, atom_costs, s_table=s_table)
+        costs_sched =  tools.process_symbol_costs_str(args.symbol_costs)
+        atoms = ase.Atoms(''.join([atom for atom in costs_sched if atom!='Z']))
+        dummy_state = data.state_from_atom_costsched(atoms, costs_sched, s_table=s_table, zMask=args.maskZ)
         initial_state = data.rewind_state(dummy_state, 0, infbag=True)
 
-    stop_idx = s_table.symbol_to_element('Z') if infbag else None
     logging.info(f'Initial state: canvas={len(initial_state.elements)} atom(s), bag={initial_state.bag}')
     envs = rl.EnvironmentCollection([
-        rl.DiscreteMolecularEnvironment(reward_fn, initial_state, s_table, min_reward=args.min_reward, infbag=infbag, stop_idx=stop_idx)
+        rl.DiscreteMolecularEnvironment(reward_fn, initial_state, s_table, min_reward=args.min_reward, infbag=infbag, stop_idx=stop_idx, costs_sched=costs_sched, seed=args.seed, byiter=byiter, maskZ=args.maskZ)
         for _ in range(args.num_envs)
     ])
 
@@ -151,13 +156,14 @@ def main() -> None:
     dataset = []
     trajectory_lengths = []
     total_num_episodes = 0
+    total_train_episodes = 0
     for i in range(args.num_iters):
         logging.info(f'Iteration {i}')
 
         # Collect data
         num_episodes = args.num_episodes_per_iter if i > 0 else args.num_initial_episodes
         logging.debug(f'Rollout with {num_episodes} episodes')
-        new_taus = rl.rollout(
+        new_taus, _ = rl.rollout(
             agent=agent,
             envs=envs,
             num_steps=None,
@@ -197,6 +203,7 @@ def main() -> None:
                         ),
                         start_index=len(tau[0].state.elements) if tau[0].state.elements[0] != 0 else 0,
                         reward=config.reward,
+                        bag_traj = [sars.state.bag for sars in tau]+[tau[-1].next_state.bag]  if infbag else None
                     ) for config in configs
                 ]
                 total_num_episodes += len(configs)
@@ -206,32 +213,39 @@ def main() -> None:
                     state=tau[-1].next_state,
                     start_index=len(tau[0].state.elements) if tau[0].state.elements[0] != 0 else 0,
                     reward=tau[-1].reward,
+                    bag_traj = [sars.state.bag for sars in tau]+[tau[-1].next_state.bag] if infbag else None
                 ) for tau in new_taus
             ]
             total_num_episodes += len(new_taus)
 
-        # Generate new trajectories from EndPoints
         generated_trajectories = []
-        for end_point in end_points:
-            # Check if episode was terminated by environment
-            if end_point.reward <= args.min_reward:
-                continue
-
-            generated_trajectories += create_trajectories(
-                end_point=end_point,
-                cutoff=args.r_max,
-                num_paths=max(int(args.num_paths_per_atom * len(end_point.state.elements)), 1),
-                seed=args.seed,
-                infbag=infbag,
-            )
+        others = []
+        if infbag and not byiter:
+            for new_tau,end_point in zip(new_taus,end_points):
+                if end_point.reward > args.min_reward:
+                    generated_trajectories += [new_tau]
+                    continue 
+                if args.keepall_trajs and end_point.reward >= args.min_reward:
+                    # generated_trajectories += [new_tau]
+                    others+=[new_tau]
+        # Generate new trajectories from EndPoints
+        else:
+            for end_point in end_points:
+                # Check if episode was terminated by environment
+                if end_point.reward < args.min_reward:
+                    continue 
+                if not args.keepall_trajs and end_point.reward <= args.min_reward:
+                    continue
+                
+                generated_trajectories += create_trajectories(
+                    end_point=end_point,
+                    cutoff=args.r_max,
+                    num_paths=max(int(args.num_paths_per_atom * len(end_point.state.elements)), 1),
+                    seed=args.seed,
+                    infbag=infbag,
+                )
         new_taus = generated_trajectories
-
-        logging.debug('Analyzing generated trajectories')
-        tau_info: Dict[str, Any] = data.analyze_trajectories(new_taus)
-        tau_info['iteration'] = i
-        tau_info['total_num_episodes'] = total_num_episodes
-        tau_info['kind'] = 'train'
-        logger.log(tau_info)
+        total_train_episodes += len(new_taus)
 
         # Update buffer
         trajectory_lengths += [len(tau) for tau in new_taus]
@@ -239,6 +253,18 @@ def main() -> None:
             trajectory_lengths = trajectory_lengths[-args.max_num_episodes:]
         dataset += [data.process_sars(sars=sars, cutoff=args.d_max, infbag=infbag) for tau in new_taus for sars in tau]
         dataset = dataset[-sum(trajectory_lengths):]
+
+        logging.debug('Analyzing generated trajectories')
+        tau_info: Dict[str, Any] = data.analyze_trajectories(new_taus)
+        tau_info['iteration'] = i
+        tau_info['total_num_episodes'] = total_num_episodes
+        tau_info['total_train_episodes'] = total_train_episodes
+        tau_info['kind'] = 'train'
+        tau_info['dataset_episodes'] = len(trajectory_lengths)
+        tau_info['dataset_steps'] = len(dataset)
+        tau_info['dataset_episode_avg_length'] = tau_info['dataset_steps']/tau_info['dataset_episodes']
+        tau_info['dataset_episode_avg_length2'] = np.mean(trajectory_lengths)
+        logger.log(tau_info)
 
         logging.debug(f'Preparing dataloader with {len(dataset)} steps')
         data_loader = data.DataLoader(
@@ -259,6 +285,7 @@ def main() -> None:
             cutoff=args.d_max,
             device=device,
             num_epochs=args.num_epochs,
+            envs = envs
         )
         train_info = {
             'progress': info,
@@ -271,7 +298,7 @@ def main() -> None:
         # Evaluate
         if i % args.eval_interval == 0:
             logging.debug('Evaluation rollout')
-            eval_trajectories = rl.rollout(
+            eval_trajectories,eval_elem_probs_json = rl.rollout(
                 agent=agent,
                 envs=envs,
                 num_steps=None,
@@ -285,8 +312,9 @@ def main() -> None:
             tau_eval['iteration'] = i
             tau_eval['total_num_episodes'] = total_num_episodes
             tau_eval['kind'] = 'eval'
+            tau_eval['probs_json'] = eval_elem_probs_json
             logger.log(tau_eval)
-            logging.info(f'eval_return={tau_eval["return"]:.3f}')
+            logging.info(f'{args.log_dir+tag}: eval_return={tau_eval["return"]:.3f}')
 
             terminal_atoms = [
                 data.state_to_atoms(tau[-1].next_state, s_table, info={'reward': tau[-1].reward}, infbag=infbag)
@@ -294,9 +322,16 @@ def main() -> None:
             ]
             ase.io.write(os.path.join(args.log_dir, f'terminals_{tag}_{i}.xyz'), images=terminal_atoms, format='extxyz')
 
-            if tau_eval['return'] > highest_return:
-                highest_return = tau_eval['return']
-                handler.save(tools.CheckpointState(agent, optimizer), counter=i)
+            if infbag: 
+                bag_traj_0 = np.array([sars.state.bag.flatten() for sars in eval_trajectories[0]]+[eval_trajectories[0][-1].next_state.bag.flatten()])
+                np.savetxt(os.path.join(args.log_dir, f'terminals_bagtraj_{tag}_{i}.txt'), bag_traj_0)
+
+            # if tau_eval['return'] > highest_return:
+            #     highest_return = tau_eval['return']
+            #     handler.save(tools.CheckpointState(agent, optimizer), counter=i)
+
+            # if i % 300 == 0:
+            #     handler.save(tools.CheckpointState(agent, optimizer), counter=i)
 
     logging.info('Saving model')
     os.makedirs(name=args.checkpoint_dir, exist_ok=True)

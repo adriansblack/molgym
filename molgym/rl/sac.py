@@ -5,6 +5,7 @@ import torch
 from torch.optim import Optimizer
 
 from molgym import tools, data
+from molgym.rl.environment import EnvironmentCollection
 from .agent import SACAgent, SACTarget
 
 
@@ -15,13 +16,14 @@ def compute_loss_q(
     alpha: float,
     cutoff: float,  # Angstrom
     device: torch.device,
+    envs: EnvironmentCollection
 ) -> torch.Tensor:
 
     # Bellman backup for Q functions
     with torch.no_grad():
         # Target actions come from *current* policy
         response, _aux = ac.policy(batch['next_state'], action=None, training=True)
-        s_next_next = data.propagate_batch(batch['next_state'], response['action'], cutoff=cutoff, infbag=ac.infbag)
+        s_next_next = data.propagate_batch(batch['next_state'], response['action'], cutoff=cutoff, infbag=ac.infbag, envs=envs)
         s_next_next.to(device)
 
         # Target Q-values Q(T(s', a'))
@@ -47,9 +49,10 @@ def compute_surr_loss_policy(
     alpha: float,
     cutoff: float,
     device: torch.device,
+    envs: EnvironmentCollection
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     response, _aux = ac.policy(batch['state'], action=None, training=True)
-    s_next = data.propagate_batch(batch['state'], response['action'], cutoff=cutoff)
+    s_next = data.propagate_batch(batch['state'], response['action'], cutoff=cutoff, envs=envs)
     s_next.to(device)
 
     with torch.no_grad():
@@ -77,6 +80,7 @@ def train_epoch(
     polyak: float,
     cutoff: float,  # Angstrom
     device: torch.device,
+    envs: EnvironmentCollection,
 ) -> Dict[str, Any]:
 
     infos: List[tools.TensorDict] = []
@@ -86,12 +90,13 @@ def train_epoch(
         batch = tools.dict_to_device(batch, device)
 
         optimizer.zero_grad()
-        loss_q = compute_loss_q(ac, ac_target, batch, alpha=alpha, cutoff=cutoff, device=device)
+        loss_q = compute_loss_q(ac, ac_target, batch, alpha=alpha, cutoff=cutoff, device=device, envs=envs)
         surr_loss_pi_ent, surr_loss_pi_q = compute_surr_loss_policy(ac,
                                                                     batch,
                                                                     alpha=alpha,
                                                                     cutoff=cutoff,
-                                                                    device=device)
+                                                                    device=device,
+                                                                    envs=envs)
         loss = surr_loss_pi_ent + surr_loss_pi_q + loss_q
         loss.backward()
         optimizer.step()
@@ -134,6 +139,7 @@ def train(
     cutoff: float,  # Angstrom
     num_epochs: int,
     device: torch.device,
+    envs: EnvironmentCollection
 ) -> List[Dict[str, Any]]:
     logging.debug(f'Training for {num_epochs} epoch(s)')
     info = []
@@ -147,6 +153,8 @@ def train(
             polyak=polyak,
             cutoff=cutoff,
             device=device,
+            envs = envs,
+
         )
         metrics['epoch'] = epoch
         info.append(metrics)

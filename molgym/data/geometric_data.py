@@ -5,6 +5,7 @@ import torch.utils.data
 import torch_geometric
 
 from molgym import tools
+# from molgym.rl.environment import EnvironmentCollection
 from . import utils, trajectory, graph_tools
 from .trajectory import (State, Action, FOCUS_KEY, ELEMENT_KEY, DISTANCE_KEY, ORIENTATION_KEY, ELEMENTS_KEY,
                          POSITIONS_KEY, BAG_KEY, Bag, propagate)
@@ -156,10 +157,32 @@ def state_from_td(td: tools.TensorDict) -> State:
         bag=tools.to_numpy(td[BAG_KEY]).reshape(-1),
     )
 
+def next_bag(byiter: bool, curr_bag: np.ndarray, curr_elements: np.ndarray, bag_schedule: np.ndarray, act_elem: int, stop_idx: int, maskZ: bool = True) -> Bag:
+    if byiter:
+        if len(curr_elements)==1 and curr_elements[-1]==0: n = 1
+        elif len(curr_elements)+1 >= len(bag_schedule): n = len(bag_schedule)-1
+        else: n = len(curr_elements)+1
+        new_bag = np.vstack([curr_bag[0],bag_schedule[n]])
+    else: 
+        new_bag = curr_bag.copy()
+        new_count = min(len(bag_schedule)-1,sum(curr_elements==act_elem)+1)
+        new_bag[1,act_elem]=bag_schedule[new_count,act_elem]
+    if maskZ:
+        new_bag[0,stop_idx]=1
+    return new_bag
 
-def propagate_batch(states: StateData, actions: tools.TensorDict, cutoff: float, infbag: bool = False) -> StateData:
+def propagate_batch(states: StateData, actions: tools.TensorDict, cutoff: float, infbag: bool = False, envs = None, seed: int=0) -> StateData:
     state_list = [state_from_td(state) for state in states.to_data_list()]
     action_list = actions_from_td(actions)
-    next_state_list = [propagate(s, a, infbag) for s, a in zip(state_list, action_list)]
+    if infbag: 
+        env_idx_list = np.random.randint(0,len(envs),len(state_list))
+        next_bag_list = []
+        for s,a,e_i in zip(state_list,action_list,env_idx_list):
+            env = envs.envs[e_i]
+            env.reset_bag_schedule()
+            bag_schedule = env.bag_schedule
+            next_bag_list.append(next_bag(env.byiter, s.bag.reshape(2,-1), s.elements, bag_schedule, a.element, env.stop_idx, env.maskZ).flatten())
+    else: next_bag_list = [None]*len(state_list)
+    next_state_list = [propagate(s, a, infbag, b) for s, a, b in zip(state_list, action_list,next_bag_list)]
     next_states_processed = [geometrize_state(s_next, cutoff=cutoff, num_classes=states.node_attrs.shape[1], floats=infbag) for s_next in next_state_list]
     return collate_fn(next_states_processed)

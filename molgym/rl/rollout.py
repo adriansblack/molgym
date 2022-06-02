@@ -1,10 +1,12 @@
 from typing import List, Optional
 
 import torch
+import json
+import numpy as np
 
 from molgym import data, tools
+from molgym.tools import to_numpy
 from .environment import EnvironmentCollection
-
 
 def rollout(
     agent: torch.nn.Module,
@@ -26,6 +28,9 @@ def rollout(
     unfinished_taus: List[List[data.SARS]] = [[] for _ in range(len(envs))]
     taus: List[data.Trajectory] = []
 
+    eval_elem_probs_json = None
+    eval_probs = {}
+
     while ((num_iters is None or iter_counter < num_iters)
            and (num_episodes is None or episode_counter < num_episodes)):
         data_loader = data.DataLoader(
@@ -38,7 +43,7 @@ def rollout(
         action_list: List[tools.TensorDict] = []
         for batch in data_loader:
             batch = tools.dict_to_device(batch, device)
-            response, _info = agent(state=batch['state'], action=None, training=training)
+            response, aux = agent(state=batch['state'], action=None, training=training)
             action_list.append(response['action'])
 
         action_td = tools.concat_tensor_dicts(action_list)
@@ -51,6 +56,12 @@ def rollout(
         for tau, s, a, r, next_s, d in zip(unfinished_taus, states, actions, rewards, next_states, dones):
             tau.append(data.SARS(s, a, r, next_s, d))
 
+        if not training:
+            for i in range(len(envs)):
+                elements_placed = len(states[i].elements) if states[i].elements[-1]!=0 else 0
+                if elements_placed not in eval_probs: eval_probs[elements_placed] = []
+                eval_probs[elements_placed].append(to_numpy(aux['distrs'][1].probs)[i])
+
         for i in range(len(envs)):
             # possible that we end up with more trajectories than num_episodes
             if unfinished_taus[i][-1].done:
@@ -62,4 +73,9 @@ def rollout(
         states = next_states
         iter_counter += 1
 
-    return taus
+    if not training:
+        for placed,probs in eval_probs.items():
+            eval_probs[placed] = np.round(np.array(probs).mean(axis=0),decimals=3).tolist()
+        eval_elem_probs_json = json.dumps(eval_probs)
+
+    return taus, eval_elem_probs_json

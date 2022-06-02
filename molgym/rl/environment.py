@@ -1,7 +1,7 @@
 import abc
 import logging
 from typing import Tuple, List
-
+from collections import Counter
 import numpy as np
 
 from molgym import data
@@ -35,6 +35,15 @@ class MolecularEnvironment(abc.ABC):
     def step(self, action: Action) -> Tuple[State, float, bool, dict]:
         raise NotImplementedError
 
+class atom_price_schedule:
+    def __init__(self, atom: str):
+        self.schedule = []
+        self.prices = []
+        self.element = atom
+    def add(self, count: int, cost: float):
+        self.prices.append(cost)
+        self.schedule.append(count)
+    
 
 class DiscreteMolecularEnvironment(MolecularEnvironment):
     def __init__(
@@ -45,8 +54,12 @@ class DiscreteMolecularEnvironment(MolecularEnvironment):
             min_atomic_distance=0.6,  # Angstrom
             max_solo_distance=2.0,  # Angstrom
             min_reward=-0.6,  # Hartree
-            infbag = False,
-            stop_idx = None
+            infbag: bool = False,
+            stop_idx: int = None,
+            costs_sched: dict = None,
+            seed: int = 0,
+            byiter: bool = True,
+            maskZ: bool = False,
     ):
         self.reward_fn = reward_fn
         self.initial_state = initial_state
@@ -62,37 +75,78 @@ class DiscreteMolecularEnvironment(MolecularEnvironment):
 
         self.current_state = self.initial_state
         self.terminal = False
+
         self.infbag = infbag
         self.stop_idx = stop_idx
+        self.cost_sched = costs_sched
+        self.byiter = byiter
+        if self.infbag: 
+            max_incr_iter = 0
+            for cost_tups in costs_sched.values():
+                max_incr_iter = max(max_incr_iter,np.sum(np.array(cost_tups,dtype=int)[:,2]))
+            self.bag_schedule = np.zeros((max_incr_iter+1,len(costs_sched)))
+        self.maskZ = maskZ
+
+        self.rng = np.random.default_rng(seed)
 
     def reset(self) -> State:
         self.current_state = self.initial_state
         self.terminal = False
+        if self.infbag: self.reset_bag_schedule()
         return self.current_state
+
+    def reset_bag_schedule(self):
+        for atom,cost_tups in self.cost_sched.items():
+            incr_idxs = []
+            costs = []
+            for (c,s,e) in cost_tups:
+                costs.append(c)
+                if s==e: r = s
+                else: r = self.rng.integers(s,e,endpoint=True)
+                incr_idxs.append(r)
+            incr_idxs.append(1)
+            incr_idxs = incr_idxs[1:]
+            y = np.repeat(costs,incr_idxs)
+            y = np.pad(y,[0,len(self.bag_schedule)-len(y)],mode='edge')
+            self.bag_schedule[:,self.s_table.symbol_to_element(atom)]=y
 
     def step(self, action: Action) -> Tuple[State, float, bool, dict]:
         if self.terminal:
             raise RuntimeError('Stepping with terminal state')
 
-        self.current_state = data.propagate(self.current_state, action, self.infbag)
+        if self.infbag: new_bag = data.next_bag(self.byiter, self.current_state.bag,self.current_state.elements, self.bag_schedule,action.element, self.stop_idx, self.maskZ)
+        self.current_state = data.propagate(self.current_state, action, self.infbag, new_bag)
 
         # Is state valid?
         if not self._is_valid_state(self.current_state):
             self.terminal = True
-            return self.current_state, self.min_reward, True, {}
+            return self.current_state, self.min_reward-1, True, {}
 
         # Is state terminal?
         if is_terminal(self.current_state, self.infbag, self.stop_idx):
             done = True
             self.terminal = True
 
-            if self.infbag: rew_state = data.rewind_state(self.current_state, -1, infbag=True)
+            if self.infbag: rew_state = data.rewind_state(self.current_state, -1, self.infbag, self.byiter, self.bag_schedule)
             else: rew_state = self.current_state
             
-            reward, info = self._calculate_reward(rew_state)
-            if len(rew_state.elements)==0: reward = self.min_reward
+            if self.infbag and len(rew_state.elements)==0: 
+                return self.current_state, self.min_reward-1, True, {}
+            else: reward, info = self._calculate_reward(rew_state)
 
-            if self.infbag: reward +=np.sum(rew_state.bag[1][rew_state.elements])
+            if self.infbag: 
+                if self.byiter: 
+                    idx = [np.arange(len(self.current_state.elements)),self.current_state.elements]
+                    if len(self.current_state.elements)>len(self.bag_schedule):
+                        extra = len(self.current_state.elements)-len(self.bag_schedule)
+                        bag_schedule_temp = np.vstack((self.bag_schedule,np.tile(self.bag_schedule[-1],(extra,1))))
+                    else: bag_schedule_temp = self.bag_schedule
+                    reward +=np.sum(bag_schedule_temp[idx])
+                else:
+                    for elem,count in Counter(self.current_state.elements).items():
+                        reward += np.sum(self.bag_schedule[:count,elem])
+                        extra = count-len(self.bag_schedule)
+                        if extra>0: reward+= self.bag_schedule[-1,elem]*extra
         else:
             done = False
             reward, info = 0.0, {}

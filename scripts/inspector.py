@@ -9,7 +9,7 @@ import torch
 from e3nn import o3
 
 from molgym import data, tools, distributions
-from molgym.tools import to_numpy
+from molgym.tools import to_numpy,process_symbol_costs_str
 
 
 def parse_args() -> argparse.Namespace:
@@ -20,6 +20,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--symbols', help='symbols', type=str, required=True)
     parser.add_argument('--xyz', help='path to trajectory (.xyz)', type=str, required=True)
     parser.add_argument('--index', help='config in XYZ file', type=int, required=False, default=0)
+    parser.add_argument('--symbol_costs', help='per atom costs', type=str, required=False)
+    parser.add_argument('--bagtraj', help='path to bag trajectory (.txt)', type=str, required=False)
 
     parser.add_argument('--d_min', help='minimum distance (in Ang)', type=float, default=0.9)
     parser.add_argument('--d_max', help='maximum distance (in Ang)', type=float, default=1.8)
@@ -238,11 +240,14 @@ def main():
     focuses = atoms.info.get('focuses', None)
     assert len(focuses) == len(atoms) if focuses is not None else True
     if infbag: 
-        atom_costs = {k:v[1] for k,v in atoms.info['bag'].items()}
-        terminal_state = data.state_from_atom_costs(atoms, atom_costs, s_table=s_table)
+        # costs_sched =  process_symbol_costs_str(args.symbol_costs)
+        bag_traj = [bag.reshape(2,-1) for bag in np.loadtxt(args.bagtraj)]
+        terminal_state = data.state_from_atom_bag(atoms, bag_traj[-1], s_table=s_table)
         if len(terminal_state.elements)>1 and terminal_state.elements[-1]=='X': terminal_state.elements[-1]='Z'
-    else: terminal_state = data.state_from_atoms(atoms, s_table)
-    sars_list = data.generate_sparse_reward_trajectory(terminal_state, final_reward=0.0, focuses=focuses, infbag=infbag)
+    else: 
+        terminal_state = data.state_from_atoms(atoms, s_table)
+        bag_traj = None
+    sars_list = data.generate_sparse_reward_trajectory(terminal_state, final_reward=0.0, focuses=focuses, infbag=infbag, bag_traj=bag_traj)
 
     data_loader = data.DataLoader(
         dataset=[data.process_sa(state=item.state, cutoff=args.d_max, action=item.action, infbag=infbag) for item in sars_list],
